@@ -108,7 +108,7 @@ def read_fits_file(args):
 
     getter = GetData()
 
-    light_curves = []
+    light_curves = {}
 
     header_HDU = afits.open(head_file)
     header_data = header_HDU[1].data
@@ -116,7 +116,7 @@ def read_fits_file(args):
     for i, head in enumerate(header_data):
         model_num = head['SIM_TYPE_INDEX']
         snid = head['SNID']
-        objid = 'field_{}_base_{}'.format(model_num, snid)
+        objid = '{}_{}'.format(model_num, snid)
         ptrobs_min = head['PTROBS_MIN']
         ptrobs_max = head['PTROBS_MAX']
         peakmag_g = head['SIM_PEAKMAG_g']
@@ -144,7 +144,7 @@ def read_fits_file(args):
                                               dec, objid, redshift, mwebv, known_redshift=known_redshift,
                                               training_set_parameters=None)
             savepd = inputlightcurve.preprocess_light_curve()
-            light_curves.append(savepd)
+            light_curves[objid] = savepd
         except IndexError as e:
             print("No detections:", e)  # TODO: maybe do better error checking in future
         except AttributeError as e:
@@ -177,10 +177,10 @@ def read_light_curves_from_snana_fits_files(head_files, phot_files, passbands=('
         phot_files_part = phot_files[i]
         args_list.append((head_files_part, phot_files_part, passbands, known_redshift))
 
-    light_curves = []
+    light_curves = {}
     if nprocesses == 1:
         for args in args_list:
-            light_curves += read_fits_file(args)
+            light_curves.update(read_fits_file(args))
     else:
         pool = mp.Pool(nprocesses)
         results = pool.map_async(read_fits_file, args_list)
@@ -190,5 +190,8 @@ def read_light_curves_from_snana_fits_files(head_files, phot_files, passbands=('
         outputs = results.get()
         print('combining results...')
         for i, output in enumerate(outputs):
-            light_curves += output
+            print(i, len(outputs))
+            light_curves.update(output)
+
+    return light_curves
 
