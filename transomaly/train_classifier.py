@@ -26,13 +26,13 @@ def train_model(X_train, X_test, y_train, y_test, fig_dir='.', epochs=20, retrai
         model = Sequential()
 
         model.add(LSTM(100, return_sequences=True))
-        # model.add(Dropout(0.2, seed=42))
-        # model.add(BatchNormalization())
+        model.add(Dropout(0.2, seed=42))
+        model.add(BatchNormalization())
 
-        # model.add(LSTM(100, return_sequences=True))
-        # # model.add(Dropout(0.2, seed=42))
-        # model.add(BatchNormalization())
+        model.add(LSTM(100, return_sequences=True))
         # model.add(Dropout(0.2, seed=42))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.2, seed=42))
 
         model.add(TimeDistributed(Dense(npb)))
         model.compile(loss='mse', optimizer='adam')
@@ -49,6 +49,10 @@ def plot_metrics(model, X_test, y_test, timesX_test, passbands, fig_dir):
     print(y_pred)
     print(y_test)
 
+    # Get errors
+    errors = y_test - y_pred
+    mean = np.mean(errors, axis=1)
+
     # Plot predictions vs time per class
     font = {'family': 'normal',
             'size': 36}
@@ -61,9 +65,9 @@ def plot_metrics(model, X_test, y_test, timesX_test, passbands, fig_dir):
         fig, ax1 = plt.subplots(nrows=1, ncols=1, figsize=(13, 15), num="lc_{}".format(idx))
 
         for pbidx, pb in enumerate(passbands):
-            ax1.plot(timesX_test[idx][:argmax], X_test[idx][:, pbidx][:argmax], c='b', lw=3, label=f"X:{pb}", marker=MARKPB[pb], markersize=10, alpha=ALPHAPB[pb])
-            ax1.plot(timesX_test[idx][:argmax], y_test[idx][:, pbidx][:argmax], c='g', lw=3, label=f"y_test:{pb}", marker=MARKPB[pb], markersize=10, alpha=ALPHAPB[pb])
-            ax1.plot(timesX_test[idx][:argmax], y_pred[idx][:, pbidx][:argmax], c='r', lw=3, label=f"y_pred:{pb}", marker=MARKPB[pb], markersize=10, alpha=ALPHAPB[pb])
+            # ax1.plot(timesX_test[idx][:argmax], X_test[idx][:, pbidx][:argmax], c='b', lw=3, label=f"X:{pb}", marker=MARKPB[pb], markersize=10, alpha=ALPHAPB[pb])
+            ax1.plot(timesX_test[idx][:argmax], y_test[idx][:, pbidx][:argmax], c='tab:blue', lw=3, label=f"y_test:{pb}", marker=MARKPB[pb], markersize=10, alpha=ALPHAPB[pb])
+            ax1.plot(timesX_test[idx][:argmax], y_pred[idx][:, pbidx][:argmax], c='tab:orange', lw=3, label=f"y_pred:{pb}", marker=MARKPB[pb], markersize=10, alpha=ALPHAPB[pb])
 
         ax1.legend(frameon=True, fontsize=33)
         plt.tight_layout()
@@ -74,7 +78,7 @@ def plot_metrics(model, X_test, y_test, timesX_test, passbands, fig_dir):
 def main():
     data_dir = '/Users/danmuth/PycharmProjects/transomaly/data'
     fig_dir = '/Users/danmuth/PycharmProjects/transomaly/plots'
-    train_epochs = 20
+    train_epochs = 2000
     retrain = True
     passbands = ('g', 'r')
 
