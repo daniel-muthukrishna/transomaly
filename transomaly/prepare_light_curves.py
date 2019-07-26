@@ -7,15 +7,18 @@ from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 import celerite
 from celerite import terms
+import matplotlib
+matplotlib.use('Agg')
 
 from transomaly import helpers
 from transomaly.read_light_curves_from_snana_fits import read_light_curves_from_snana_fits_files
 
 
-def get_data(class_num, data_dir='data/ZTF_20190512/', passbands=('g', 'r'), nprocesses=1):
-    save_lc_filepath = os.path.join(data_dir, "..", "saved_light_curves", f"lc_classnum_{class_num}.pickle")
+def get_data(class_num, data_dir='data/ZTF_20190512/', save_dir='data/saved_light_curves/', passbands=('g', 'r'),
+             nprocesses=1, redo=False):
+    save_lc_filepath = os.path.join(save_dir, f"lc_classnum_{class_num}.pickle")
 
-    if os.path.exists(save_lc_filepath):
+    if os.path.exists(save_lc_filepath) and not redo:
         with open(save_lc_filepath, "rb") as fp:  # Unpickling
             light_curves = pickle.load(fp)
     else:
@@ -54,7 +57,7 @@ def fit_gaussian_process(args):
         kernel = terms.Matern32Term(log_sigma=0.1, log_rho=0.1)
         gp_lc[pb] = celerite.GP(kernel)
         gp_lc[pb].compute(time, fluxerr)
-        # print("Initial log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
+        print("Initial log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
 
         # Optimise parameters
         from scipy.optimize import minimize
@@ -63,11 +66,15 @@ def fit_gaussian_process(args):
             return -gp.log_likelihood(y)
         initial_params = gp_lc[pb].get_parameter_vector()
         bounds = gp_lc[pb].get_parameter_bounds()
-        r = minimize(neg_log_like, initial_params, method="L-BFGS-B", bounds=bounds, args=(flux, gp_lc[pb]))
+        try:
+            r = minimize(neg_log_like, initial_params, method="L-BFGS-B", bounds=bounds, args=(flux, gp_lc[pb]))
+        except Exception as e:
+            print("Failed object", objid, e)
+            return
         gp_lc[pb].set_parameter_vector(r.x)
-        # print(r)
+        print(r)
 
-        # print("Final log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
+        print("Final log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
 
         # Plot GP fit
         if plot:
@@ -76,7 +83,7 @@ def fit_gaussian_process(args):
             pred_mean, pred_var = gp_lc[pb].predict(flux, x, return_var=True)
             pred_std = np.sqrt(pred_var)
 
-            color = {'g': 'tab:green', 'r': "tab:orange"}
+            color = {'g': 'tab:green', 'r': "tab:red"}
             # plt.plot(time, flux, "k", lw=1.5, alpha=0.3)
             plt.errorbar(time, flux, yerr=fluxerr, fmt=".", capsize=0, color=color[pb])
             plt.plot(x, pred_mean, color=color[pb])
@@ -89,13 +96,17 @@ def fit_gaussian_process(args):
         plt.savefig(f'/Users/danmuth/PycharmProjects/transomaly/plots/gp_fits/gp_{objid}.pdf')
         plt.close()
 
-    return gp_lc
+    return gp_lc, objid
 
 
-def save_gps(light_curves, save_dir='data/', class_num=None, passbands=('g', 'r'), plot=False, nprocesses=1):
-    save_gp_filepath = os.path.join(save_dir, "saved_light_curves", f"gp_classnum_{class_num}.pickle")
+def save_gps(light_curves, save_dir='data/saved_light_curves/', class_num=None, passbands=('g', 'r'), plot=False,
+             nprocesses=1, redo=False):
+    """ Save gaussian process fits.
+    Don't plot in parallel
+    """
+    save_gp_filepath = os.path.join(save_dir, f"gp_classnum_{class_num}.pickle")
 
-    if os.path.exists(save_gp_filepath):
+    if os.path.exists(save_gp_filepath) and not redo:
         with open(save_gp_filepath, "rb") as fp:  # Unpickling
             saved_gp_fits = pickle.load(fp)
     else:
@@ -106,8 +117,10 @@ def save_gps(light_curves, save_dir='data/', class_num=None, passbands=('g', 'r'
         saved_gp_fits = {}
         if nprocesses == 1:
             for args in args_list:
-                lc, objid, passbands, plot = args
-                saved_gp_fits[objid] = fit_gaussian_process(args)
+                out = fit_gaussian_process(args)
+                if out is not None:
+                    gp_lc, objid = out
+                    saved_gp_fits[objid] = gp_lc
         else:
             pool = mp.Pool(nprocesses)
             results = pool.map_async(fit_gaussian_process, args_list)
@@ -118,7 +131,12 @@ def save_gps(light_curves, save_dir='data/', class_num=None, passbands=('g', 'r'
             print('combining results...')
             for i, output in enumerate(outputs):
                 print(i, len(outputs))
-                saved_gp_fits[objid] = output
+                if output is not None:
+                    gp_lc, objid = output
+                    saved_gp_fits[objid] = gp_lc
+
+        with open(save_gp_filepath, "wb") as fp:  # Pickling
+            pickle.dump(saved_gp_fits, fp)
 
     return saved_gp_fits
 
@@ -195,12 +213,17 @@ def get_arrays(data_dir='data'):
     return X_train, X_test, y_train, y_test, timesX_train, timesX_test
 
 
-if __name__ == '__main__':
+def main():
     nprocesses = 1
     class_num = 1
     light_curves = get_data(class_num, data_dir='/Users/danmuth/PycharmProjects/transomaly/data/ZTF_20190512/',
+                            save_dir='/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves/',
                             nprocesses=nprocesses)
-    gp_lc = save_gps(light_curves, save_dir='/Users/danmuth/PycharmProjects/transomaly/data/', class_num=class_num,
-                     passbands=('g', 'r'), plot=True, nprocesses=nprocesses)
+    saved_gp_fits = save_gps(light_curves, save_dir='/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves',
+                             class_num=class_num, passbands=('g', 'r'), plot=True, nprocesses=nprocesses)
+
+
+if __name__ == '__main__':
+    main()
 
 
