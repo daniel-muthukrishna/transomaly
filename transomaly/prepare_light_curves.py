@@ -49,12 +49,13 @@ def fit_gaussian_process(args):
     gp_lc = {}
     if plot:
         plt.figure()
+
     for pbidx, pb in enumerate(passbands):
         time = lc[pb]['time'].dropna()
         flux = lc[pb]['flux'].dropna()
         fluxerr = lc[pb]['fluxErr'].dropna()
 
-        kernel = terms.Matern32Term(log_sigma=0.1, log_rho=0.1)
+        kernel = terms.Matern32Term(log_sigma=5., log_rho=3.)
         gp_lc[pb] = celerite.GP(kernel)
         gp_lc[pb].compute(time, fluxerr)
         print("Initial log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
@@ -76,6 +77,13 @@ def fit_gaussian_process(args):
 
         print("Final log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
 
+        # Remove objects with bad fits
+        x = np.linspace(min(time), max(time), 5000)
+        pred_mean, pred_var = gp_lc[pb].predict(flux, x, return_var=True)
+        if np.any(~np.isfinite(pred_mean)) or gp_lc[pb].log_likelihood(flux) < -380:
+            print("Bad fit for object", objid)
+            return
+
         # Plot GP fit
         if plot:
             # Predict with GP
@@ -89,6 +97,8 @@ def fit_gaussian_process(args):
             plt.plot(x, pred_mean, color=color[pb])
             plt.fill_between(x, pred_mean + pred_std, pred_mean - pred_std, color=color[pb], alpha=0.3,
                              edgecolor="none")
+
+    # TODO: share hyperparameters across passband light curves
 
     if plot:
         plt.xlabel("Days since trigger")
@@ -220,7 +230,7 @@ def main():
                             save_dir='/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves/',
                             nprocesses=nprocesses)
     saved_gp_fits = save_gps(light_curves, save_dir='/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves',
-                             class_num=class_num, passbands=('g', 'r'), plot=True, nprocesses=nprocesses)
+                             class_num=class_num, passbands=('g', 'r'), plot=True, nprocesses=nprocesses, redo=True)
 
 
 if __name__ == '__main__':

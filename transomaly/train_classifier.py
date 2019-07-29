@@ -7,8 +7,9 @@ from keras.models import load_model
 from keras.layers import Dense, Input
 from keras.layers import LSTM, GRU
 from keras.layers import Dropout, BatchNormalization, Activation, TimeDistributed
+import keras.backend as K
 
-from transomaly import prepare_data
+from transomaly.prepare_arrays import PrepareTrainingSetArrays
 
 
 COLPB = {'g': 'tab:blue', 'r': 'tab:orange'}
@@ -16,8 +17,12 @@ MARKPB = {'g': 'o', 'r': 's', 'z': 'd'}
 ALPHAPB = {'g': 0.3, 'r': 1., 'z': 1}
 
 
-def train_model(X_train, X_test, y_train, y_test, fig_dir='.', epochs=20, retrain=False, passbands=('g', 'r')):
-    model_filename = os.path.join('..', "keras_model.hdf5")
+def custom_loss(yTrue,yPred):
+    return K.sum(K.log(yTrue) - K.log(yPred))
+
+
+def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir='.', epochs=20, retrain=False, passbands=('g', 'r')):
+    model_filename = os.path.join(fig_dir, "keras_model.hdf5")
     npb = len(passbands)
 
     if not retrain and os.path.isfile(model_filename):
@@ -77,14 +82,29 @@ def plot_metrics(model, X_test, y_test, timesX_test, passbands, fig_dir):
 
 def main():
     data_dir = '/Users/danmuth/PycharmProjects/transomaly/data'
+    save_dir = '/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves'
+    training_set_dir = '/Users/danmuth/PycharmProjects/transomaly/data/training_set_files/'
     fig_dir = '/Users/danmuth/PycharmProjects/transomaly/plots'
-    train_epochs = 2000
-    retrain = True
     passbands = ('g', 'r')
+    contextual_info = (0,)
+    nprocesses = 1
+    class_nums = (1,)
+    otherchange = ''
+    nsamples = 1
+    redo = False
+    train_epochs = 200
+    retrain = False
 
-    X_train, X_test, y_train, y_test, timesX_train, timesX_test = prepare_data.get_data(data_dir=data_dir)
+    fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}.npy".format(otherchange, contextual_info, nsamples, class_nums))
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
 
-    model = train_model(X_train, X_test, y_train, y_test, fig_dir=fig_dir, epochs=train_epochs, retrain=retrain, passbands=passbands)
+    preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo)
+    X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
+    timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
+        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses)
+
+    model = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs, retrain=retrain, passbands=passbands)
 
     plot_metrics(model, X_test, y_test, timesX_test, passbands=passbands, fig_dir=fig_dir)
 
