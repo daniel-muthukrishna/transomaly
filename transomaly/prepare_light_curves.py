@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
 import celerite
 from celerite import terms
+from scipy.optimize import minimize
 import matplotlib
 matplotlib.use('Agg')
 
@@ -43,6 +44,16 @@ def get_data(class_num, data_dir='data/ZTF_20190512/', save_dir='data/saved_ligh
     return light_curves
 
 
+def combined_neg_log_like(params, fluxes, gp_lcs, passbands):
+    loglike = 0
+    for pb in passbands:
+        gp_lcs[pb].set_parameter_vector(params)
+        y = fluxes[pb]
+        loglike += gp_lcs[pb].log_likelihood(y)
+
+    return -loglike
+
+
 def fit_gaussian_process(args):
     lc, objid, passbands, plot = args
 
@@ -50,30 +61,32 @@ def fit_gaussian_process(args):
     if plot:
         plt.figure()
 
+    kernel = terms.Matern32Term(log_sigma=5., log_rho=3.)
+    times, fluxes, fluxerrs = {}, {}, {}
     for pbidx, pb in enumerate(passbands):
-        time = lc[pb]['time'].dropna()
-        flux = lc[pb]['flux'].dropna()
-        fluxerr = lc[pb]['fluxErr'].dropna()
+        times[pb] = lc[pb]['time'].dropna()
+        fluxes[pb] = lc[pb]['flux'].dropna()
+        fluxerrs[pb] = lc[pb]['fluxErr'].dropna()
 
-        kernel = terms.Matern32Term(log_sigma=5., log_rho=3.)
         gp_lc[pb] = celerite.GP(kernel)
-        gp_lc[pb].compute(time, fluxerr)
-        print("Initial log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
-
-        # Optimise parameters
-        from scipy.optimize import minimize
-        def neg_log_like(params, y, gp):
-            gp.set_parameter_vector(params)
-            return -gp.log_likelihood(y)
-        initial_params = gp_lc[pb].get_parameter_vector()
+        gp_lc[pb].compute(times[pb], fluxerrs[pb])
+        print("Initial log likelihood: {0}".format(gp_lc[pb].log_likelihood(fluxes[pb])))
+        initial_params = gp_lc[pb].get_parameter_vector()  # This should be the same across passbands
         bounds = gp_lc[pb].get_parameter_bounds()
-        try:
-            r = minimize(neg_log_like, initial_params, method="L-BFGS-B", bounds=bounds, args=(flux, gp_lc[pb]))
-        except Exception as e:
-            print("Failed object", objid, e)
-            return
-        gp_lc[pb].set_parameter_vector(r.x)
+
+    # Optimise parameters
+    try:
+        r = minimize(combined_neg_log_like, initial_params, method="L-BFGS-B", bounds=bounds, args=(fluxes, gp_lc, passbands))
         print(r)
+    except Exception as e:
+        print("Failed object", objid, e)
+        return
+
+    for pbidx, pb in enumerate(passbands):
+        gp_lc[pb].set_parameter_vector(r.x)
+        time = times[pb]
+        flux = fluxes[pb]
+        fluxerr = fluxerrs[pb]
 
         print("Final log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
 
