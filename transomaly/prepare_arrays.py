@@ -2,7 +2,7 @@ import os
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from transomaly.prepare_light_curves import get_data, save_gps
+from transomaly.fit_gaussian_processes import get_data, save_gps
 
 
 class PrepareArrays(object):
