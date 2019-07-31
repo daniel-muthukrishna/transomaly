@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 
 from transomaly.fit_gaussian_processes import get_data, save_gps
 
@@ -187,6 +188,9 @@ class PrepareTrainingSetArrays(PrepareArrays):
             X_train, Xerr_train, timesX_train, labels_train, objids_train = self.make_arrays(lcs_train, gps_train, nsamples)
             X_test, Xerr_test, timesX_test, labels_test, objids_test = self.make_arrays(lcs_test, gps_test, nsamples)
 
+            # Shuffle training set but leave testing set in order or gaussian process samples
+            X_train, Xerr_train, timesX_train, labels_train, objids_train = shuffle(X_train, Xerr_train, timesX_train, labels_train, objids_train, random_state=42)
+
             np.save(os.path.join(self.training_set_dir, "X_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums)), X_train)
             np.save(os.path.join(self.training_set_dir, "Xerr_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums)), Xerr_train)
             np.save(os.path.join(self.training_set_dir, "timesX_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums)), timesX_train)
@@ -223,6 +227,15 @@ class PrepareTrainingSetArrays(PrepareArrays):
         X_test = X_test[:, :-1]
         Xerr_test = Xerr_test[:, :-1]
         timesX_test = timesX_test[:, :-1]
+
+        # Add errors as extra column to y
+        yerr_train = np.copy(yerr_train)
+        yerr_test = np.copy(yerr_test)
+        yerr_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
+        yerr_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
+        y_train = np.dstack((y_train, yerr_train))
+        y_test = np.dstack((y_test, yerr_test))
+
 
         return X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
                timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test
