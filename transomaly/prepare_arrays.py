@@ -44,7 +44,7 @@ class PrepareArrays(object):
                 len_t = len(tinterp)
         return tinterp, len_t
 
-    def update_X(self, X, Xerr, i, gp_lc, lc, tinterp, len_t, objid, contextual_info, otherinfo, nsamples=10):
+    def update_X(self, X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, contextual_info, otherinfo, nsamples=10):
 
         for j, pb in enumerate(self.passbands):
             if pb not in lc:
@@ -82,13 +82,13 @@ class PrepareArrays(object):
 
             # store samples in X
             for ns in range(nsamples):
-                X[i + ns][j][0:len_t] = samples[ns]
-                Xerr[i + ns][j][0:len_t] = pred_std
+                X[idx + ns][j][0:len_t] = samples[ns]
+                Xerr[idx + ns][j][0:len_t] = pred_std
 
         # Add contextual information
         for ns in range(nsamples):
             for jj, c_idx in enumerate(contextual_info, 1):
-                X[i + ns][j + jj][0:len_t] = otherinfo[c_idx] * np.ones(len_t)
+                X[idx + ns][j + jj][0:len_t] = otherinfo[c_idx] * np.ones(len_t)
 
         return X
 
@@ -107,6 +107,7 @@ class PrepareArrays(object):
         objids = []
 
         for i, (objid, gp_lc) in enumerate(saved_gp_fits.items()):
+            idx = i * nsamples
             print(i, nobjects)
             lc = light_curves[objid]
 
@@ -117,10 +118,10 @@ class PrepareArrays(object):
 
             tinterp, len_t = self.get_t_interp(lc)
             for ns in range(nsamples):
-                timesX[i + ns][0:len_t] = tinterp
+                timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
-                labels[i + ns] = int(objid.split('_')[0])
-            X = self.update_X(X, Xerr, i, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
+                labels[idx + ns] = int(objid.split('_')[0])
+            X = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
 
         # Count nobjects per class
         classes = sorted(list(set(labels)))
