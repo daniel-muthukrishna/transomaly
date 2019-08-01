@@ -3,15 +3,12 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp
-from sklearn.model_selection import train_test_split
-from keras.utils import to_categorical
 import celerite
 from celerite import terms
 from scipy.optimize import minimize
 import matplotlib
 matplotlib.use('Agg')
 
-from transomaly import helpers
 from transomaly.read_light_curves_from_snana_fits import read_light_curves_from_snana_fits_files
 
 

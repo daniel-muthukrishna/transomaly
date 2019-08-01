@@ -203,7 +203,7 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
 
 def main():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(SCRIPT_DIR, '..', 'data')
+    data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
     save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
     training_set_dir = os.path.join(SCRIPT_DIR, '..', 'data/training_set_files')
     fig_dir = os.path.join(SCRIPT_DIR, '..', 'plots')
