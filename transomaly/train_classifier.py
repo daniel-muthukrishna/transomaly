@@ -40,6 +40,18 @@ def mean_squared_error():
     return loss
 
 
+def mean_squared_error_over_error():
+    """ Compute mean squared in form of a keras loss function. """
+
+    def loss(y_true, y_pred):
+        y_err = y_true[:, :, 2:4]
+        y_t = y_true[:, :, 0:2]
+        y_p = y_pred[:, :, 0:2]
+        return K.mean(K.square((y_p - y_t)/y_err), axis=-1)
+
+    return loss
+
+
 def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir='.', epochs=20, retrain=False,
                 passbands=('g', 'r'), model_change=''):
 
@@ -51,27 +63,36 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     npb = len(passbands)
 
     if not retrain and os.path.isfile(model_filename):
-        model = load_model(model_filename, custom_objects={'loss': mean_squared_error()})
+        if 'chi2' in model_change:
+            model = load_model(model_filename, custom_objects={'loss': chisquare_loss()})
+        elif 'mse_oe'in model_change:
+            model = load_model(model_filename, custom_objects={'loss': mean_squared_error_over_error()})
+        else:
+            model = load_model(model_filename, custom_objects={'loss': mean_squared_error()})
     else:
         model = Sequential()
 
         model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.2, seed=42))
+        model.add(Dropout(0.4, seed=42))
         model.add(BatchNormalization())
 
         model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.2, seed=42))
+        model.add(Dropout(0.4, seed=42))
         model.add(BatchNormalization())
-        model.add(Dropout(0.2, seed=42))
+        model.add(Dropout(0.4, seed=42))
 
         model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.2, seed=42))
+        model.add(Dropout(0.4, seed=42))
         model.add(BatchNormalization())
-        model.add(Dropout(0.2, seed=42))
+        model.add(Dropout(0.4, seed=42))
 
         model.add(TimeDistributed(Dense(npb)))
-        model.compile(loss=mean_squared_error(), optimizer='adam')
-        # model.compile(loss=chisquare_loss(), optimizer='adam')
+        if 'chi2' in model_change:
+            model.compile(loss=chisquare_loss(), optimizer='adam')
+        elif 'mse_oe' in model_change:
+            model.compile(loss=mean_squared_error_over_error(), optimizer='adam')
+        else:
+            model.compile(loss=mean_squared_error(), optimizer='adam')
         history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=64, verbose=2)
 
         print(model.summary())
@@ -186,15 +207,15 @@ def main():
     training_set_dir = '/Users/danmuth/PycharmProjects/transomaly/data/training_set_files/'
     fig_dir = '/Users/danmuth/PycharmProjects/transomaly/plots'
     passbands = ('g', 'r')
-    contextual_info = (0,)
+    contextual_info = ()
     nprocesses = 1
     class_nums = (1,)
-    otherchange = ''
+    otherchange = '5050testvalidation'
     nsamples = 1
     redo = False
-    train_epochs = 400
-    retrain = True
-    nn_architecture_change = 'mse'  # 'chi2'  # 'mse'
+    train_epochs = 30
+    retrain = False
+    nn_architecture_change = 'chi2'  # 'chi2'  # 'mse'
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):

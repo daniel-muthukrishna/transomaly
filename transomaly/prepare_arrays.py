@@ -179,7 +179,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
             objids = list(set(light_curves.keys()) & set(saved_gp_fits.keys()))
 
             # Train test split for light_ curves and GPs
-            objids_train, objids_test = train_test_split(objids, train_size=0.80, shuffle=True, random_state=42)
+            objids_train, objids_test = train_test_split(objids, train_size=0.50, shuffle=True, random_state=42)
             lcs_train = {k: light_curves[k] for k in objids_train}
             gps_train = {k: saved_gp_fits[k] for k in objids_train}
             lcs_test = {k: light_curves[k] for k in objids_test}
@@ -235,7 +235,6 @@ class PrepareTrainingSetArrays(PrepareArrays):
         ye_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
         y_train = np.dstack((y_train, ye_train))
         y_test = np.dstack((y_test, ye_test))
-
 
         return X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
                timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test
