@@ -229,12 +229,12 @@ class PrepareTrainingSetArrays(PrepareArrays):
         timesX_test = timesX_test[:, :-1]
 
         # Add errors as extra column to y
-        yerr_train = np.copy(yerr_train)
-        yerr_test = np.copy(yerr_test)
-        yerr_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
-        yerr_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
-        y_train = np.dstack((y_train, yerr_train))
-        y_test = np.dstack((y_test, yerr_test))
+        ye_train = np.copy(yerr_train)
+        ye_test = np.copy(yerr_test)
+        ye_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
+        ye_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
+        y_train = np.dstack((y_train, ye_train))
+        y_test = np.dstack((y_test, ye_test))
 
 
         return X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \

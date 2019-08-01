@@ -51,7 +51,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     npb = len(passbands)
 
     if not retrain and os.path.isfile(model_filename):
-        model = load_model(model_filename)
+        model = load_model(model_filename, custom_objects={'loss': mean_squared_error()})
     else:
         model = Sequential()
 
@@ -65,8 +65,8 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
         model.add(Dropout(0.2, seed=42))
 
         model.add(TimeDistributed(Dense(npb)))
-        # model.compile(loss=mean_squared_error(), optimizer='adam')
-        model.compile(loss=chisquare_loss(), optimizer='adam')
+        model.compile(loss=mean_squared_error(), optimizer='adam')
+        # model.compile(loss=chisquare_loss(), optimizer='adam')
         history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=64, verbose=2)
 
         print(model.summary())
@@ -89,21 +89,36 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     y_pred = model.predict(X_test)
 
     # Get reduced chi_squared
+    chi2_hist = []
     chi2_reduced_allobjects = 0
+    reduce_count = 0
     for idx in range(nobjects):
-        for pbidx in range(npassbands):
+        for pbidx, pb in enumerate(passbands):
             m = yerr_test[idx, :, pbidx] != 0  # ignore zeros (where no data exists)
             yt = y_test[idx, :, pbidx][m]
             yp = y_pred[idx, :, pbidx][m]
             ye = yerr_test[idx, :, pbidx][m]
+            if len(yt) == 0:
+                reduce_count += 1
+                print(f"No values for {objids_test[idx]} {pb}-band")
+                continue
             chi2 = sum(((yt - yp) / ye) ** 2)
             chi2_reduced = chi2 / len(yt)
             chi2_reduced_allobjects += chi2_reduced
-    chi2_reduced_allobjects = chi2_reduced_allobjects / (nobjects * npassbands)
+        chi2_hist.append(chi2_reduced/npassbands)
+    chi2_reduced_allobjects = chi2_reduced_allobjects / ((nobjects * npassbands) - reduce_count)
     print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
-    with open('model_info.txt', 'w') as file:
+    print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
+    with open(os.path.join(fig_dir, model_name, 'model_info.txt'), 'w') as file:
         file.write(model_name)
         file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}")
+        file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}")
+    plt.figure()
+    plt.hist(chi2_hist, bins=int(max(chi2_hist)/10), range=(0,50))
+    plt.legend()
+    plt.xlabel("chi-squared")
+    plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution.pdf'))
+    plt.show()
 
     # Plot predictions vs time per class
     font = {'family': 'normal',
@@ -113,14 +128,14 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     for idx in np.arange(0, 100):
         sidx = idx * nsamples  # Assumes like samples are in order
         print("Plotting example vs time", idx)
-        argmax = timesX_test[sidx].argmax()  # -1
+        argmax = -1  #timesX_test[sidx].argmax()  # -1
 
         fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(13, 15), num="lc_{}".format(objids_test[sidx]), sharex=True)
 
         for pbidx, pb in enumerate(passbands):
             for s in range(nsamples):
                 lw = 3 if s == 0 else 0.5
-                alpha = ALPHAPB[pb] if s == 0 else 0.1
+                alpha = 1 if s == 0 else 0.1
                 plotlabeltest = "ytest:{}".format(pb) if s == 0 else ''
                 plotlabelpred = "ypred:{}".format(pb) if s == 0 else ''
                 marker = None  # MARKPB[pb] if s == 0 else None
@@ -143,8 +158,9 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         anomaly_score_samples = chi2_samples
         anomaly_score_mean = np.mean(anomaly_score_samples, axis=0)
         anomaly_score_std = np.std(anomaly_score_samples, axis=0)
-        ax2.plot(timesX_test[sidx][:argmax], anomaly_score_mean, lw=3)
-        ax2.fill_between(timesX_test[sidx][:argmax], anomaly_score_mean + anomaly_score_std, anomaly_score_mean - anomaly_score_std, alpha=0.3, edgecolor="none")
+
+        ax2.plot(timesX_test[sidx][:argmax][m], anomaly_score_mean, lw=3)
+        ax2.fill_between(timesX_test[sidx][:argmax][m], anomaly_score_mean + anomaly_score_std, anomaly_score_mean - anomaly_score_std, alpha=0.3, edgecolor="none")
 
         ax1.legend(frameon=True, fontsize=33)
         ax1.set_ylabel("Relative flux")
@@ -173,7 +189,7 @@ def main():
     redo = False
     train_epochs = 400
     retrain = False
-    nn_architecture_change = 'chi2'  # 'chi2'  # 'mse'
+    nn_architecture_change = 'mse'  # 'chi2'  # 'mse'
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):
