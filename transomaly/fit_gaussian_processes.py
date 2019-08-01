@@ -167,11 +167,13 @@ def save_gps(light_curves, save_dir='data/saved_light_curves/', class_num=None, 
 def main():
     nprocesses = 1
     class_num = 1
-    light_curves = get_data(class_num, data_dir='/Users/danmuth/PycharmProjects/transomaly/data/ZTF_20190512/',
-                            save_dir='/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves/',
-                            nprocesses=nprocesses)
-    saved_gp_fits = save_gps(light_curves, save_dir='/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves',
-                             class_num=class_num, passbands=('g', 'r'), plot=True, nprocesses=nprocesses, redo=True)
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
+    save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
+
+    light_curves = get_data(class_num, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses)
+    saved_gp_fits = save_gps(light_curves, save_dir=save_dir, class_num=class_num, passbands=('g', 'r'), plot=True,
+                             nprocesses=nprocesses, redo=True)
 
 
 if __name__ == '__main__':

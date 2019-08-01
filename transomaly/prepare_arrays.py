@@ -243,9 +243,10 @@ class PrepareTrainingSetArrays(PrepareArrays):
 def main():
     passbands = ('g', 'r')
     contextual_info = (0,)
-    data_dir = '/Users/danmuth/PycharmProjects/transomaly/data/ZTF_20190512/'
-    save_dir = '/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves'
-    training_set_dir = '/Users/danmuth/PycharmProjects/transomaly/data/training_set_files/'
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
+    save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
+    training_set_dir = os.path.join(SCRIPT_DIR, '..', 'data/training_set_files')
     nprocesses = 1
     class_nums = (1,)
     otherchange = ''

@@ -202,10 +202,11 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
 
 
 def main():
-    data_dir = '/Users/danmuth/PycharmProjects/transomaly/data'
-    save_dir = '/Users/danmuth/PycharmProjects/transomaly/data/saved_light_curves'
-    training_set_dir = '/Users/danmuth/PycharmProjects/transomaly/data/training_set_files/'
-    fig_dir = '/Users/danmuth/PycharmProjects/transomaly/plots'
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(SCRIPT_DIR, '..', 'data')
+    save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
+    training_set_dir = os.path.join(SCRIPT_DIR, '..', 'data/training_set_files')
+    fig_dir = os.path.join(SCRIPT_DIR, '..', 'plots')
     passbands = ('g', 'r')
     contextual_info = ()
     nprocesses = 1
@@ -213,9 +214,9 @@ def main():
     otherchange = '5050testvalidation'
     nsamples = 1
     redo = False
-    train_epochs = 30
+    train_epochs = 400
     retrain = False
-    nn_architecture_change = 'chi2'  # 'chi2'  # 'mse'
+    nn_architecture_change = 'mse'  # 'chi2'  # 'mse'
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):
