@@ -64,6 +64,11 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
         model.add(BatchNormalization())
         model.add(Dropout(0.2, seed=42))
 
+        model.add(LSTM(100, return_sequences=True))
+        model.add(Dropout(0.2, seed=42))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.2, seed=42))
+
         model.add(TimeDistributed(Dense(npb)))
         model.compile(loss=mean_squared_error(), optimizer='adam')
         # model.compile(loss=chisquare_loss(), optimizer='adam')
@@ -188,7 +193,7 @@ def main():
     nsamples = 1
     redo = False
     train_epochs = 400
-    retrain = False
+    retrain = True
     nn_architecture_change = 'mse'  # 'chi2'  # 'mse'
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
