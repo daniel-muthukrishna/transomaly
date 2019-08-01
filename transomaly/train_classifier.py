@@ -10,6 +10,7 @@ from keras.layers import Dropout, BatchNormalization, Activation, TimeDistribute
 import keras.backend as K
 
 from transomaly.prepare_arrays import PrepareTrainingSetArrays
+from transomaly.fit_gaussian_processes import get_data
 
 COLPB = {'g': 'tab:green', 'r': 'tab:orange'}
 MARKPB = {'g': 'o', 'r': 's', 'z': 'd'}
@@ -110,7 +111,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     return model, model_name
 
 
-def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples):
+def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses):
     nobjects, ntimesteps, npassbands = yerr_test.shape
     y_pred = model.predict(X_test)
 
@@ -146,6 +147,12 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution.pdf'))
     plt.show()
 
+    # Get raw light curve data
+    light_curves = {}
+    for classnum in np.unique(labels_test):
+        print(f"Getting lightcurves for class:{classnum}")
+        light_curves[classnum] = get_data(classnum, data_dir, save_dir, nprocesses)
+
     # Plot predictions vs time per class
     font = {'family': 'normal',
             'size': 36}
@@ -155,6 +162,9 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         sidx = idx * nsamples  # Assumes like samples are in order
         print("Plotting example vs time", idx)
         argmax = -1  #timesX_test[sidx].argmax()  # -1
+
+        # Get raw light curve observations
+        lc = light_curves[labels_test[sidx]][objids_test[sidx]]
 
         fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(13, 15), num="lc_{}".format(objids_test[sidx]), sharex=True)
 
@@ -169,6 +179,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                          label=plotlabeltest, marker=marker, markersize=10, alpha=alpha, linestyle='-')
                 ax1.plot(timesX_test[sidx+s][:argmax], y_pred[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
                          label=plotlabelpred, marker=marker, markersize=10, alpha=alpha, linestyle=':')
+            ax1.errorbar(lc[pb]['time'].dropna(), lc[pb]['flux'].dropna(), yerr=lc[pb]['fluxErr'].dropna(),
+                         fmt=".", capsize=0, color=COLPB[pb])
 
         # Plot anomaly scores
         chi2_samples = []
@@ -214,7 +226,7 @@ def main():
     otherchange = '5050testvalidation'
     nsamples = 1
     redo = False
-    train_epochs = 400
+    train_epochs = 30
     retrain = False
     nn_architecture_change = 'mse'  # 'chi2'  # 'mse'
 
@@ -231,7 +243,7 @@ def main():
                         retrain=retrain, passbands=passbands, model_change=nn_architecture_change)
 
     plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses)
 
 
 if __name__ == '__main__':
