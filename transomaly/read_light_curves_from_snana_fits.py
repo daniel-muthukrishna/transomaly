@@ -173,6 +173,7 @@ def read_light_curves_from_snana_fits_files(head_files, phot_files, passbands=('
 
     args_list = []
     for i, head_file in enumerate(head_files):
+        assert phot_files[i].split('_')[-2].split('-')[1] == head_files[i].split('_')[-2].split('-')[1]
         head_files_part = head_files[i]
         phot_files_part = phot_files[i]
         args_list.append((head_files_part, phot_files_part, passbands, known_redshift))
