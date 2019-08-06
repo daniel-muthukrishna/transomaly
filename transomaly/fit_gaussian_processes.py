@@ -52,7 +52,7 @@ def combined_neg_log_like(params, fluxes, gp_lcs, passbands):
 
 
 def fit_gaussian_process(args):
-    lc, objid, passbands, plot = args
+    lc, objid, passbands, plot, extrapolate = args
 
     gp_lc = {}
     if plot:
@@ -88,7 +88,10 @@ def fit_gaussian_process(args):
         print("Final log likelihood: {0}".format(gp_lc[pb].log_likelihood(flux)))
 
         # Remove objects with bad fits
-        x = np.linspace(min(time), max(time), 5000)
+        if extrapolate is True:
+            x = np.linspace(min(min(time), -70), max(max(time), 80), 5000)
+        else:
+            x = np.linspace(min(time), max(time), 5000)
         pred_mean, pred_var = gp_lc[pb].predict(flux, x, return_var=True)
         if np.any(~np.isfinite(pred_mean)) or gp_lc[pb].log_likelihood(flux) < -380:
             print("Bad fit for object", objid)
@@ -97,7 +100,10 @@ def fit_gaussian_process(args):
         # Plot GP fit
         if plot:
             # Predict with GP
-            x = np.linspace(min(time), max(time), 5000)
+            if extrapolate:
+                x = np.linspace(min(min(time), -70), max(max(time), 80), 5000)
+            else:
+                x = np.linspace(min(time), max(time), 5000)
             pred_mean, pred_var = gp_lc[pb].predict(flux, x, return_var=True)
             pred_std = np.sqrt(pred_var)
 
@@ -113,18 +119,24 @@ def fit_gaussian_process(args):
     if plot:
         plt.xlabel("Days since trigger")
         plt.ylabel("Flux")
-        plt.savefig(f'/Users/danmuth/PycharmProjects/transomaly/plots/gp_fits/gp_{objid}.pdf')
+        if extrapolate:
+            plt.savefig(f'/Users/danmuth/PycharmProjects/transomaly/plots/gp_fits/extrapolated/gp_{objid}.pdf')
+        else:
+            plt.savefig(f'/Users/danmuth/PycharmProjects/transomaly/plots/gp_fits/gp_{objid}.pdf')
         plt.close()
 
     return gp_lc, objid
 
 
 def save_gps(light_curves, save_dir='data/saved_light_curves/', class_num=None, passbands=('g', 'r'), plot=False,
-             nprocesses=1, redo=False):
+             nprocesses=1, redo=False, extrapolate=True):
     """ Save gaussian process fits.
     Don't plot in parallel
     """
-    save_gp_filepath = os.path.join(save_dir, f"gp_classnum_{class_num}.pickle")
+    if extrapolate:
+        save_gp_filepath = os.path.join(save_dir, f"gp_classnum_{class_num}_extrapolate.pickle")
+    else:
+        save_gp_filepath = os.path.join(save_dir, f"gp_classnum_{class_num}.pickle")
 
     if os.path.exists(save_gp_filepath) and not redo:
         with open(save_gp_filepath, "rb") as fp:  # Unpickling
@@ -132,7 +144,7 @@ def save_gps(light_curves, save_dir='data/saved_light_curves/', class_num=None, 
     else:
         args_list = []
         for objid, lc in light_curves.items():
-            args_list.append((lc, objid, passbands, plot))
+            args_list.append((lc, objid, passbands, plot, extrapolate))
 
         saved_gp_fits = {}
         if nprocesses == 1:
@@ -164,13 +176,14 @@ def save_gps(light_curves, save_dir='data/saved_light_curves/', class_num=None, 
 def main():
     nprocesses = 1
     class_num = 1
+    extrapolate = True
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
     save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
 
-    light_curves = get_data(class_num, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses)
+    light_curves = get_data(class_num, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, redo=False)
     saved_gp_fits = save_gps(light_curves, save_dir=save_dir, class_num=class_num, passbands=('g', 'r'), plot=True,
-                             nprocesses=nprocesses, redo=True)
+                             nprocesses=nprocesses, redo=True, extrapolate=extrapolate)
 
 
 if __name__ == '__main__':

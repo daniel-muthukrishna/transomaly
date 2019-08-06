@@ -32,17 +32,24 @@ class PrepareArrays(object):
 
         return mintime, maxtime
 
-    def get_t_interp(self, lc):
+    def get_t_interp(self, lc, extrapolate=False):
         mintime, maxtime = self.get_min_max_time(lc)
+
+        if extrapolate:
+            tinterp = np.arange(self.mintime, self.maxtime, step=self.timestep)
+            len_t = len(tinterp)
+            return tinterp, len_t
 
         tinterp = np.arange(mintime, maxtime, step=self.timestep)
         len_t = len(tinterp)
+
         if len_t > self.nobs:
             tinterp = tinterp[(tinterp >= self.mintime)]
             len_t = len(tinterp)
             if len_t > self.nobs:
                 tinterp = tinterp[:-(len_t - self.nobs)]
                 len_t = len(tinterp)
+
         return tinterp, len_t
 
     def update_X(self, X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, contextual_info, otherinfo, nsamples=10):
@@ -93,7 +100,7 @@ class PrepareArrays(object):
 
         return X
 
-    def make_arrays(self, light_curves, saved_gp_fits, nsamples):
+    def make_arrays(self, light_curves, saved_gp_fits, nsamples, extrapolate=True):
         nobjects = len(light_curves)
         nrows = nobjects * nsamples
 
@@ -117,7 +124,7 @@ class PrepareArrays(object):
 
             # TODO: make cuts
 
-            tinterp, len_t = self.get_t_interp(lc)
+            tinterp, len_t = self.get_t_interp(lc, extrapolate=extrapolate)
             for ns in range(nsamples):
                 timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
@@ -159,13 +166,13 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
         return light_curves
 
-    def get_gaussian_process_fits(self, light_curves, class_num, plot=False, nprocesses=1):
+    def get_gaussian_process_fits(self, light_curves, class_num, plot=False, nprocesses=1, extrapolate=True):
         saved_gp_fits = save_gps(light_curves, self.save_dir, class_num, self.passbands, plot=plot,
-                                 nprocesses=nprocesses, redo=self.redo)
+                                 nprocesses=nprocesses, redo=self.redo, extrapolate=extrapolate)
 
         return saved_gp_fits
 
-    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1):
+    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True):
         savepath = os.path.join(self.training_set_dir, "X_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums))
 
         if self.redo is True or not os.path.isfile(savepath):
@@ -173,7 +180,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
             saved_gp_fits = {}
             for class_num in class_nums:
                 light_curves.update(self.get_light_curves(class_num, nprocesses))
-                saved_gp_fits.update(self.get_gaussian_process_fits(light_curves, class_num, plot=False, nprocesses=nprocesses))
+                saved_gp_fits.update(self.get_gaussian_process_fits(light_curves, class_num, plot=False, nprocesses=nprocesses, extrapolate=extrapolate_gp))
 
             # Find intersection of dictionaries
             objids = list(set(light_curves.keys()) & set(saved_gp_fits.keys()))
@@ -185,8 +192,8 @@ class PrepareTrainingSetArrays(PrepareArrays):
             lcs_test = {k: light_curves[k] for k in objids_test}
             gps_test = {k: saved_gp_fits[k] for k in objids_test}
 
-            X_train, Xerr_train, timesX_train, labels_train, objids_train = self.make_arrays(lcs_train, gps_train, nsamples)
-            X_test, Xerr_test, timesX_test, labels_test, objids_test = self.make_arrays(lcs_test, gps_test, nsamples)
+            X_train, Xerr_train, timesX_train, labels_train, objids_train = self.make_arrays(lcs_train, gps_train, nsamples, extrapolate_gp)
+            X_test, Xerr_test, timesX_test, labels_test, objids_test = self.make_arrays(lcs_test, gps_test, nsamples, extrapolate_gp)
 
             # Shuffle training set but leave testing set in order or gaussian process samples
             X_train, Xerr_train, timesX_train, labels_train, objids_train = shuffle(X_train, Xerr_train, timesX_train, labels_train, objids_train, random_state=42)
@@ -251,9 +258,10 @@ def main():
     class_nums = (1,)
     otherchange = ''
     nsamples = 100
+    extrapolate_gp = True
 
     prepare_training_set = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir)
-    prepare_training_set.make_training_set(class_nums, nsamples, otherchange, nprocesses)
+    prepare_training_set.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp)
 
 
 if __name__ == '__main__':

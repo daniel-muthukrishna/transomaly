@@ -12,7 +12,7 @@ import keras.backend as K
 from transomaly.prepare_arrays import PrepareTrainingSetArrays
 from transomaly.fit_gaussian_processes import get_data
 
-COLPB = {'g': 'tab:green', 'r': 'tab:orange'}
+COLPB = {'g': 'tab:green', 'r': 'tab:red'}
 MARKPB = {'g': 'o', 'r': 's', 'z': 'd'}
 ALPHAPB = {'g': 0.3, 'r': 1., 'z': 1}
 
@@ -160,13 +160,13 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
 
     for idx in np.arange(0, 100):
         sidx = idx * nsamples  # Assumes like samples are in order
-        print("Plotting example vs time", idx)
+        print("Plotting example vs time", idx, objids_test[sidx])
         argmax = -1  #timesX_test[sidx].argmax()  # -1
 
         # Get raw light curve observations
         lc = light_curves[labels_test[sidx]][objids_test[sidx]]
 
-        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(13, 15), num="lc_{}".format(objids_test[sidx]), sharex=True)
+        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(13, 15), sharex=True)
 
         for pbidx, pb in enumerate(passbands):
             for s in range(nsamples):
@@ -180,7 +180,7 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                 ax1.plot(timesX_test[sidx+s][:argmax], y_pred[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
                          label=plotlabelpred, marker=marker, markersize=10, alpha=alpha, linestyle=':')
             ax1.errorbar(lc[pb]['time'].dropna(), lc[pb]['flux'].dropna(), yerr=lc[pb]['fluxErr'].dropna(),
-                         fmt=".", capsize=0, color=COLPB[pb])
+                         fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
 
         # Plot anomaly scores
         chi2_samples = []
@@ -191,7 +191,12 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                 yt = y_test[sidx+s, :, pbidx][:argmax][m]
                 yp = y_pred[sidx+s, :, pbidx][:argmax][m]
                 ye = yerr_test[sidx+s, :, pbidx][:argmax][m]
-                chi2 += ((yp - yt)/ye)**2
+                try:
+                    chi2 += ((yp - yt)/ye)**2
+                except ValueError as e:
+                    pbidx -= 1
+                    m = yerr_test[sidx + s, :, pbidx][:argmax] != 0
+                    print(f"Failed chi2 object {objids_test[sidx+s]}", e)
             chi2_samples.append(chi2 / npassbands)
         anomaly_score_samples = chi2_samples
         anomaly_score_mean = np.mean(anomaly_score_samples, axis=0)
@@ -207,10 +212,11 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         plt.tight_layout()
         fig.subplots_adjust(hspace=0)
 
-        plt.savefig(os.path.join(fig_dir, model_name, f"lc_{objids_test[sidx]}.pdf"))
+        plt.savefig(os.path.join(fig_dir, model_name, f"lc_{objids_test[sidx]}_{idx}.pdf"))
 
     print(model_name)
     print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
+    print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
 
 
 def main():
@@ -221,12 +227,13 @@ def main():
     fig_dir = os.path.join(SCRIPT_DIR, '..', 'plots')
     passbands = ('g', 'r')
     contextual_info = ()
-    nprocesses = 1
+    nprocesses = None
     class_nums = (1,)
-    otherchange = '5050testvalidation'
-    nsamples = 1
+    otherchange = 'singleobject_1_99285690_extrapolatedgp'  #'5050testvalidation' #
+    nsamples = 5000
+    extrapolate_gp = False
     redo = False
-    train_epochs = 30
+    train_epochs = 5
     retrain = False
     nn_architecture_change = 'mse'  # 'chi2'  # 'mse'
 
@@ -237,7 +244,7 @@ def main():
     preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo)
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses)
+        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp)
 
     model, model_name = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs,
                         retrain=retrain, passbands=passbands, model_change=nn_architecture_change)
