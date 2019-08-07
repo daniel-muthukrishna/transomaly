@@ -10,7 +10,7 @@ from keras.layers import Dropout, BatchNormalization, Activation, TimeDistribute
 import keras.backend as K
 
 from transomaly.prepare_arrays import PrepareTrainingSetArrays
-from transomaly.fit_gaussian_processes import get_data
+from transomaly.fit_gaussian_processes import get_data, save_gps
 
 COLPB = {'g': 'tab:green', 'r': 'tab:red'}
 MARKPB = {'g': 'o', 'r': 's', 'z': 'd'}
@@ -111,7 +111,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     return model, model_name
 
 
-def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses):
+def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True):
     nobjects, ntimesteps, npassbands = yerr_test.shape
     y_pred = model.predict(X_test)
 
@@ -119,6 +119,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     chi2_hist = []
     chi2_reduced_allobjects = 0
     reduce_count = 0
+    save_object_chi2 = []
+    save_chi2 = {}
     for idx in range(nobjects):
         for pbidx, pb in enumerate(passbands):
             m = yerr_test[idx, :, pbidx] != 0  # ignore zeros (where no data exists)
@@ -133,6 +135,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
             chi2_reduced = chi2 / len(yt)
             chi2_reduced_allobjects += chi2_reduced
         chi2_hist.append(chi2_reduced/npassbands)
+        save_object_chi2.append((idx, objids_test[idx], chi2_reduced/npassbands))
+        save_chi2[objids_test[idx]] = chi2_reduced/npassbands
     chi2_reduced_allobjects = chi2_reduced_allobjects / ((nobjects * npassbands) - reduce_count)
     print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
     print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
@@ -141,17 +145,24 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}")
         file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}")
     plt.figure()
-    plt.hist(chi2_hist, bins=int(max(chi2_hist)/10), range=(0,50))
+    plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 1.5*np.std(chi2_hist))))
     plt.legend()
     plt.xlabel("chi-squared")
     plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution.pdf'))
     plt.show()
 
+    save_object_chi2 = sorted(save_object_chi2, key=lambda x: x[2])
+    print(save_object_chi2[:100])
+
     # Get raw light curve data
     light_curves = {}
+    gp_fits = {}
     for classnum in np.unique(labels_test):
         print(f"Getting lightcurves for class:{classnum}")
         light_curves[classnum] = get_data(classnum, data_dir, save_dir, nprocesses)
+        if plot_gp is True and nsamples == 1:
+            gp_fits[classnum] = save_gps(light_curves, save_dir, classnum, passbands, plot=False,
+                                     nprocesses=nprocesses, redo=False, extrapolate=extrapolate_gp)
 
     # Plot predictions vs time per class
     font = {'family': 'normal',
@@ -159,12 +170,16 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     matplotlib.rc('font', **font)
 
     for idx in np.arange(0, 100):
+    # for (idx, oid, chi2_red) in save_object_chi2[:100]:
+    #     print(idx, oid, chi2_red)
         sidx = idx * nsamples  # Assumes like samples are in order
         print("Plotting example vs time", idx, objids_test[sidx])
         argmax = -1  #timesX_test[sidx].argmax()  # -1
 
         # Get raw light curve observations
         lc = light_curves[labels_test[sidx]][objids_test[sidx]]
+        if plot_gp is True and nsamples == 1:
+            gp_lc = gp_fits[labels_test[sidx]][objids_test[sidx]]
 
         fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(13, 15), sharex=True)
 
@@ -181,6 +196,13 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                          label=plotlabelpred, marker=marker, markersize=10, alpha=alpha, linestyle=':')
             ax1.errorbar(lc[pb]['time'].dropna(), lc[pb]['flux'].dropna(), yerr=lc[pb]['fluxErr'].dropna(),
                          fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
+            ax1.text(0.05, 0.95, f"$\chi^2 = {round(save_chi2[objids_test[idx]], 3)}$", horizontalalignment='left', verticalalignment='center', transform=ax1.transAxes)
+            if plot_gp is True and nsamples == 1:
+                gp_lc[pb].compute(lc[pb]['time'].dropna(), lc[pb]['fluxErr'].dropna())
+                pred_mean, pred_var = gp_lc[pb].predict(lc[pb]['flux'].dropna(), timesX_test[sidx+s][:argmax], return_var=True)
+                pred_std = np.sqrt(pred_var)
+                ax1.fill_between(timesX_test[sidx+s][:argmax], pred_mean + pred_std, pred_mean - pred_std, color=COLPB[pb], alpha=0.3,
+                                 edgecolor="none")
 
         # Plot anomaly scores
         chi2_samples = []
@@ -201,6 +223,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         anomaly_score_samples = chi2_samples
         anomaly_score_mean = np.mean(anomaly_score_samples, axis=0)
         anomaly_score_std = np.std(anomaly_score_samples, axis=0)
+        ax2.text(0.05, 0.95, f"$\chi^2 = {round(np.sum(anomaly_score_mean)/len(yt), 3)}$", horizontalalignment='left',
+                 verticalalignment='center', transform=ax2.transAxes)
 
         ax2.plot(timesX_test[sidx][:argmax][m], anomaly_score_mean, lw=3)
         ax2.fill_between(timesX_test[sidx][:argmax][m], anomaly_score_mean + anomaly_score_std, anomaly_score_mean - anomaly_score_std, alpha=0.3, edgecolor="none")
@@ -250,7 +274,10 @@ def main():
                         retrain=retrain, passbands=passbands, model_change=nn_architecture_change)
 
     plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp)
+
+    #X_train, y_train, timesX_train, yerr_train, labels_train, objids_train
+    #X_test, y_test, timesX_test, yerr_test, labels_test, objids_test
 
 
 if __name__ == '__main__':
