@@ -101,12 +101,24 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
 
         # Plot loss vs epochs
         plt.figure()
-        plt.plot(history.history['loss'])
-        plt.plot(history.history['val_loss'])
+        trainloss = history.history['loss']
+        valloss = history.history['val_loss']
+        plt.plot(trainloss)
+        plt.plot(valloss)
         plt.ylabel('loss')
         plt.xlabel('epoch')
         plt.legend(['train', 'test'], loc='upper left')
         plt.savefig(model_filename.replace('.hdf5', '.pdf'))
+        # Plot zoomed figure
+        lenloss = len(trainloss)
+        zoomloss = int(lenloss/2.)
+        plt.figure()
+        plt.plot(np.arange(zoomloss, lenloss), trainloss[zoomloss:])
+        plt.plot(np.arange(zoomloss, lenloss), valloss[zoomloss:])
+        plt.ylabel('loss')
+        plt.xlabel('epoch')
+        plt.legend(['train', 'test'], loc='upper left')
+        plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
 
     return model, model_name
 
@@ -141,11 +153,11 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
     print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
     with open(os.path.join(fig_dir, model_name, 'model_info.txt'), 'w') as file:
-        file.write(model_name)
-        file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}")
-        file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}")
+        file.write(f"{model_name}\n")
+        file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}\n")
+        file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}\n")
     plt.figure()
-    plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 1.5*np.std(chi2_hist))))
+    plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 3**np.std(chi2_hist))))
     plt.legend()
     plt.xlabel("chi-squared")
     plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution.pdf'))
@@ -237,6 +249,7 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         fig.subplots_adjust(hspace=0)
 
         plt.savefig(os.path.join(fig_dir, model_name, f"lc_{objids_test[sidx]}_{idx}.pdf"))
+        plt.close()
 
     print(model_name)
     print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
