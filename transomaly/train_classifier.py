@@ -258,8 +258,74 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
 
 
-def similarity_metric(model, ):
-    pass
+def similarity_metric(model, X_test, y_test, yerr_test, labels_test, objids_test, nsamples):
+    nobjects, ntimesteps, npassbands = X_test.shape
+    y_pred = model.predict(X_test)
+    class_nums = np.unique(labels_test)
+
+    anomaly_scores = {key: [] for key in class_nums}
+    for idx in range(nobjects):
+        sidx = idx * nsamples  # Assumes like samples are in order
+        argmax = None  # timesX_test[sidx].argmax()  # -1
+
+        # Get anomaly scores
+        chi2_samples = []
+        for s in range(nsamples):
+            chi2 = 0
+            npb = 0
+            for pbidx in range(npassbands):
+                m = yerr_test[sidx + s, :, pbidx][:argmax] != 0  # ignore zeros (where no data exists)
+                yt = y_test[sidx + s, :, pbidx][:argmax][m]
+                yp = y_pred[sidx + s, :, pbidx][:argmax][m]
+                ye = yerr_test[sidx + s, :, pbidx][:argmax][m]
+                try:
+                    chi2 += ((yp - yt) / ye) ** 2
+                    npb += 1
+                except ValueError as e:
+                    print(f"Failed chi2 object {objids_test[sidx + s]}", e)
+            chi2_samples.append(chi2 / npb)
+        anomaly_score_samples = chi2_samples
+        anomaly_score_mean = np.mean(anomaly_score_samples, axis=0)
+        anomaly_score_std = np.std(anomaly_score_samples, axis=0)
+        anomaly_score_max = max(anomaly_score_mean)
+
+        anomaly_scores[labels_test[sidx]].append(anomaly_score_max)
+
+    similarity_score = {key: [] for key in class_nums}
+    similarity_score_std = {key: [] for key in class_nums}
+    for c in class_nums:
+        similarity_score[c] = np.median(anomaly_scores[c])
+        similarity_score_std[c] = np.std(anomaly_scores[c])
+
+    return similarity_score, similarity_score_std
+
+
+def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesses, extrapolate_gp, nsamples, fig_dir):
+
+    X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
+    timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
+        preparearrays.make_training_set(class_nums=class_nums, nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=False, npred=49)
+
+    similarity_matrix = {classnum: [] for classnum in model_filepaths.keys()}
+    similarity_matrix_std = {classnum: [] for classnum in model_filepaths.keys()}
+    for class_name, model_filepath in model_filepaths.items():
+        print(class_name)
+        if not os.path.exists(model_filepath):
+            continue
+
+        if 'chi2' in model_filepath:
+            model = load_model(model_filepath, custom_objects={'loss': chisquare_loss()})
+        elif 'mse_oe' in model_filepath:
+            model = load_model(model_filepath, custom_objects={'loss': mean_squared_error_over_error()})
+        else:
+            model = load_model(model_filepath, custom_objects={'loss': mean_squared_error()})
+
+        similarity_score, similarity_score_std = similarity_metric(model, X_test, y_test, yerr_test, labels_test,
+                                                                   objids_test, nsamples)
+        similarity_matrix[class_name] = similarity_score
+        similarity_matrix_std[class_name] = similarity_score_std
+
+    print(similarity_matrix)
 
 def main():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -298,15 +364,22 @@ def main():
 
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
                  fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred)
-    #X_train, y_train, timesX_train, yerr_train, labels_train, objids_train
-    #X_test, y_test, timesX_test, yerr_test, labels_test, objids_test
 
     # Test on other classes  #51,60,62,70 AndOtherTypes
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums=(51,60,62,70), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred)
+        preparearrays.make_training_set(class_nums=(51,60,62,70,80), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred)
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
                  fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred)
+
+
+    # class_nums = (51, 60, 62, 70)  # (1, 41, 51, 60, 64, 70)
+    # model_filepaths = {'SNIa': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(1,)/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5',
+    #                    'SNII': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(2, 12, 14)/keras_model_epochs100_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs100_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5',
+    #                    'Kilonovae': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(51,)/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5',
+    #                    'AGN': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(70,)/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'}
+    #
+    # plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesses, extrapolate_gp, nsamples, fig_dir='.')
 
 
 if __name__ == '__main__':
