@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 from keras.models import Sequential
@@ -325,7 +326,44 @@ def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesse
         similarity_matrix[class_name] = similarity_score
         similarity_matrix_std[class_name] = similarity_score_std
 
+    similarity_matrix = pd.DataFrame(similarity_matrix)
+    similarity_matrix_std = pd.DataFrame(similarity_matrix_std)
+
+    similarity_matrix.to_csv('similarity_matrix.csv')
+    similarity_matrix_std.to_csv('similarity_matrix_std.csv')
+
     print(similarity_matrix)
+
+    # Plotting
+    font = {'family': 'normal',
+            'size': 36}
+    matplotlib.rc('font', **font)
+
+    xrange, yrange = similarity_matrix.shape
+    xlabels = similarity_matrix.index.values
+    ylabels = similarity_matrix.columns.values
+
+    plt.figure(figsize=(15,12))
+    plt.imshow(similarity_matrix, cmap=plt.cm.RdBu_r)
+
+    cb = plt.colorbar()
+    # cb.ax.set_yticklabels(cb.ax.get_yticklabels(), fontsize=27)
+    plt.xticks(np.arange(xrange), xlabels, rotation=90, fontsize=27)
+    plt.yticks(np.arange(yrange), ylabels, fontsize=27)
+
+    thresh_q3 = 0.75 * similarity_matrix.values.max()
+    thresh_q1 = 0.25 * similarity_matrix.values.max()
+    for i in range(xrange):
+        for j in range(yrange):
+            c = similarity_matrix.iloc[j, i]
+            cell_text = f"{c:.2f}"
+            plt.text(i, j, cell_text, va='center', ha='center',
+                     color="white" if c < thresh_q1 or c > thresh_q3 else "black")
+
+    plt.ylabel('Trained on')
+    plt.xlabel('Tested on')
+    plt.savefig("similarity_matrix.pdf")
+
 
 def main():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
