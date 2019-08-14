@@ -40,6 +40,46 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
         return saved_gp_fits
 
+    def make_arrays(self, light_curves, saved_gp_fits, nsamples, extrapolate=True):
+        nobjects = len(light_curves)
+        nrows = nobjects * nsamples
+
+        labels = np.zeros(shape=nrows, dtype=np.uint16)
+        # X = np.memmap(os.path.join(self.training_set_dir, 'X_lc_data.dat'), dtype=np.float32, mode='w+',
+        #               shape=(nrows, self.nfeatures, self.nobs))
+        # Xerr = np.memmap(os.path.join(self.training_set_dir, 'Xerr_lc_data.dat'), dtype=np.float32, mode='w+',
+        #               shape=(nrows, self.nfeatures, self.nobs))
+        X = np.zeros(shape=(nrows, self.nfeatures, self.nobs))
+        Xerr = np.zeros(shape=(nrows, self.nfeatures, self.nobs))
+        timesX = np.zeros(shape=(nrows, self.nobs))
+        objids = []
+
+        for i, (objid, gp_lc) in enumerate(saved_gp_fits.items()):
+            idx = i * nsamples
+            if i % 100 == 0:
+                print(i, nobjects)
+            lc = light_curves[objid]
+
+            otherinfo = lc['otherinfo'].values.flatten()
+            # redshift, b, mwebv, trigger_mjd, t0, peakmjd = otherinfo[0:6]
+
+            # TODO: make cuts
+
+            tinterp, len_t = self.get_t_interp(lc, extrapolate=extrapolate)
+            for ns in range(nsamples):
+                timesX[idx + ns][0:len_t] = tinterp
+                objids.append(objid)
+                labels[idx + ns] = int(objid.split('_')[0])
+            X = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
+
+        # Count nobjects per class
+        classes = sorted(list(set(labels)))
+        for c in classes:
+            nobs = len(X[labels == c])
+            print(f"class {c}: {nobs}")
+
+        return X, Xerr, timesX, labels, objids
+
     def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49):
         savepath = os.path.join(self.training_set_dir, "X_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums))
 
@@ -186,8 +226,8 @@ class PrepareTrainingSetArrays(PrepareArrays):
             Xerr_train = Xerr_train[:, :-1]
             # timesX_train = timesX_train[:, :-1]
 
-            y_test = X_test[:, 1:, :2]
-            yerr_test = Xerr_test[:, 1:, :2]
+            y_test = X_test[:, 1:, :self.npb]
+            yerr_test = Xerr_test[:, 1:, :self.npb]
             X_test = X_test[:, :-1]
             Xerr_test = Xerr_test[:, :-1]
             # timesX_test = timesX_test[:, :-1]
