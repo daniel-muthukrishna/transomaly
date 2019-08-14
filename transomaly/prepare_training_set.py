@@ -47,8 +47,10 @@ class PrepareTrainingSetArrays(PrepareArrays):
             light_curves = {}
             saved_gp_fits = {}
             for class_num in class_nums:
-                light_curves.update(self.get_light_curves(class_num, nprocesses))
-                saved_gp_fits.update(self.get_gaussian_process_fits(light_curves, class_num, plot=False, nprocesses=nprocesses, extrapolate=extrapolate_gp))
+                lcs = self.get_light_curves(class_num, nprocesses)
+                gps = self.get_gaussian_process_fits(lcs, class_num, plot=False, nprocesses=nprocesses, extrapolate=extrapolate_gp)
+                light_curves.update(lcs)
+                saved_gp_fits.update(gps)
 
             # Find intersection of dictionaries
             objids = list(set(light_curves.keys()) & set(saved_gp_fits.keys()))
