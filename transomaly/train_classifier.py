@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+import json
 from keras.models import Sequential
 from keras.models import load_model
 from keras.layers import Dense, Input
@@ -14,6 +16,7 @@ from transomaly.prepare_training_set import PrepareTrainingSetArrays
 from transomaly.fit_gaussian_processes import save_gps
 from transomaly.get_training_data import get_data
 from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_squared_error_over_error
+from transomaly import helpers
 
 COLPB = {'g': 'tab:green', 'r': 'tab:red'}
 MARKPB = {'g': 'o', 'r': 's', 'z': 'd'}
@@ -263,8 +266,10 @@ def similarity_metric(model, X_test, y_test, yerr_test, labels_test, objids_test
     nobjects, ntimesteps, npassbands = X_test.shape
     y_pred = model.predict(X_test)
     class_nums = np.unique(labels_test)
+    sntypes_map = helpers.get_sntypes()
+    class_names = [sntypes_map[class_num] for class_num in class_nums]
 
-    anomaly_scores = {key: [] for key in class_nums}
+    anomaly_scores = {key: [] for key in class_names}
     for idx in range(nobjects):
         sidx = idx * nsamples  # Assumes like samples are in order
         argmax = None  # timesX_test[sidx].argmax()  # -1
@@ -290,11 +295,12 @@ def similarity_metric(model, X_test, y_test, yerr_test, labels_test, objids_test
         anomaly_score_std = np.std(anomaly_score_samples, axis=0)
         anomaly_score_max = max(anomaly_score_mean)
 
-        anomaly_scores[labels_test[sidx]].append(anomaly_score_max)
+        class_name = sntypes_map[labels_test[sidx]]
+        anomaly_scores[class_name].append(anomaly_score_max)
 
-    similarity_score = {key: [] for key in class_nums}
-    similarity_score_std = {key: [] for key in class_nums}
-    for c in class_nums:
+    similarity_score = {key: [] for key in class_names}
+    similarity_score_std = {key: [] for key in class_names}
+    for c in class_names:
         similarity_score[c] = np.median(anomaly_scores[c])
         similarity_score_std[c] = np.std(anomaly_scores[c])
 
@@ -312,17 +318,33 @@ def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesse
     for class_name, model_filepath in model_filepaths.items():
         print(class_name)
         if not os.path.exists(model_filepath):
+            print("No model found at", model_filepath)
             continue
 
-        if 'chi2' in model_filepath:
-            model = load_model(model_filepath, custom_objects={'loss': chisquare_loss()})
-        elif 'mse_oe' in model_filepath:
-            model = load_model(model_filepath, custom_objects={'loss': mean_squared_error_over_error()})
-        else:
-            model = load_model(model_filepath, custom_objects={'loss': mean_squared_error()})
+        saved_scores_fp = os.path.join(os.path.dirname(model_filepath), 'similarity_scores.json')
 
-        similarity_score, similarity_score_std = similarity_metric(model, X_test, y_test, yerr_test, labels_test,
-                                                                   objids_test, nsamples)
+        if os.path.exists(saved_scores_fp):
+            print("Using saved similarity scores")
+            with open(saved_scores_fp, 'r') as fp:
+                similarity_score = json.load(fp)
+            with open(saved_scores_fp.replace('.json', '_std.json'), 'r') as fp:
+                similarity_score_std = json.load(fp)
+        else:
+            print("Saving similarity scores...")
+            if 'chi2' in model_filepath:
+                model = load_model(model_filepath, custom_objects={'loss': chisquare_loss()})
+            elif 'mse_oe' in model_filepath:
+                model = load_model(model_filepath, custom_objects={'loss': mean_squared_error_over_error()})
+            else:
+                model = load_model(model_filepath, custom_objects={'loss': mean_squared_error()})
+
+            similarity_score, similarity_score_std = similarity_metric(model, X_test, y_test, yerr_test, labels_test,
+                                                                       objids_test, nsamples)
+            with open(saved_scores_fp, 'w') as fp:
+                json.dump(similarity_score, fp)
+            with open(saved_scores_fp.replace('.json', '_std.json'), 'w') as fp:
+                json.dump(similarity_score_std, fp)
+
         similarity_matrix[class_name] = similarity_score
         similarity_matrix_std[class_name] = similarity_score_std
 
@@ -342,26 +364,33 @@ def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesse
     xrange, yrange = similarity_matrix.shape
     xlabels = similarity_matrix.index.values
     ylabels = similarity_matrix.columns.values
+    similarity_matrix = similarity_matrix.T
 
+    maxval = 100  # similarity_matrix.values.max()
     plt.figure(figsize=(15,12))
-    plt.imshow(similarity_matrix, cmap=plt.cm.RdBu_r)
+    plt.imshow(similarity_matrix, cmap=plt.cm.RdBu_r, vmin=0, vmax=maxval)#, norm=colors.LogNorm())
 
     cb = plt.colorbar()
     # cb.ax.set_yticklabels(cb.ax.get_yticklabels(), fontsize=27)
     plt.xticks(np.arange(xrange), xlabels, rotation=90, fontsize=27)
     plt.yticks(np.arange(yrange), ylabels, fontsize=27)
 
-    thresh_q3 = 0.75 * similarity_matrix.values.max()
-    thresh_q1 = 0.25 * similarity_matrix.values.max()
+    thresh_q3 = 0.75 * maxval
+    thresh_q1 = 0.25 * maxval
     for i in range(xrange):
         for j in range(yrange):
+            print(i, j)
             c = similarity_matrix.iloc[j, i]
-            cell_text = f"{c:.2f}"
+            if c > 100:
+                cell_text = f"{c:.0f}"
+            else:
+                cell_text = f"{c:.2f}"
             plt.text(i, j, cell_text, va='center', ha='center',
-                     color="white" if c < thresh_q1 or c > thresh_q3 else "black")
+                     color="white" if c < thresh_q1 or c > thresh_q3 else "black", fontsize=13)
 
     plt.ylabel('Trained on')
     plt.xlabel('Tested on')
+    plt.tight_layout()
     plt.savefig("similarity_matrix.pdf")
 
 
