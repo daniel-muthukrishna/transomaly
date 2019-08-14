@@ -15,8 +15,8 @@ class PrepareTrainingSetArrays(PrepareArrays):
         self.passbands = passbands
         self.contextual_info = contextual_info
         self.nobs = 50
-        self.npassbands = len(passbands)
-        self.nfeatures = self.npassbands + len(self.contextual_info)
+        self.npb = len(passbands)
+        self.nfeatures = self.npb + len(self.contextual_info)
         self.timestep = 3.0
         self.mintime = -70
         self.maxtime = 80

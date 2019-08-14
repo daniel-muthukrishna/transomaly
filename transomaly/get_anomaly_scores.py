@@ -20,7 +20,7 @@ class TransientRegressor(object):
         self.nsamples = nsamples
         self.passbands = passbands
         self.contextual_info = ()
-        self.npassbands = len(passbands)
+        self.npb = len(passbands)
 
         if model_filepath != '' and os.path.exists(model_filepath):
             self.model_filepath = model_filepath
@@ -154,7 +154,7 @@ class TransientRegressor(object):
                     yp = y_predict[sidx+s, :, pbidx][:argmax][m]
                     ye = self.yerr[sidx+s, :, pbidx][:argmax][m]
                     chi2 += ((yp - yt) / ye) ** 2
-                chi2_samples.append(chi2 / self.npassbands)
+                chi2_samples.append(chi2 / self.npb)
             anomaly_score_samples = chi2_samples
             anomaly_scores = np.mean(anomaly_score_samples, axis=0)
             anomaly_scores_std = np.std(anomaly_score_samples, axis=0)
@@ -239,7 +239,7 @@ class TransientRegressor(object):
             chi2_samples = []
             for s in range(self.nsamples):
                 chi2 = 0
-                for pbidx in range(self.npassbands):
+                for pbidx in range(self.npb):
                     m = self.y[sidx + s, :, pbidx][:argmax] != 0  # ignore zeros (where no data exists)
                     yt = self.y[sidx + s, :, pbidx][:argmax][m]
                     yp = self.y_predict[sidx + s, :, pbidx][:argmax][m]
@@ -250,7 +250,7 @@ class TransientRegressor(object):
                         pbidx -= 1
                         m = self.yerr[sidx + s, :, pbidx][:argmax] != 0
                         print(f"Failed chi2 object {self.objids[sidx + s]}", e)
-                chi2_samples.append(chi2 / self.npassbands)
+                chi2_samples.append(chi2 / self.npb)
             anomaly_score_samples = chi2_samples
             anomaly_score_mean = np.mean(anomaly_score_samples, axis=0)
             anomaly_score_std = np.std(anomaly_score_samples, axis=0)
