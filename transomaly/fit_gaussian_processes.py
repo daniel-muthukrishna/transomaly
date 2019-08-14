@@ -21,9 +21,13 @@ def combined_neg_log_like(params, fluxes, gp_lcs, passbands):
     return -loglike
 
 
-def fit_gaussian_process(args):
+def fit_gaussian_process_one_argument(args):
     lc, objid, passbands, plot, extrapolate = args
 
+    return fit_gaussian_process(lc, objid, passbands, plot, extrapolate)
+
+
+def fit_gaussian_process(lc, objid, passbands, plot, extrapolate, bad_loglike_thresh=-380):
     gp_lc = {}
     if plot:
         plt.figure()
@@ -63,7 +67,7 @@ def fit_gaussian_process(args):
         else:
             x = np.linspace(min(time), max(time), 5000)
         pred_mean, pred_var = gp_lc[pb].predict(flux, x, return_var=True)
-        if np.any(~np.isfinite(pred_mean)) or gp_lc[pb].log_likelihood(flux) < -380:
+        if np.any(~np.isfinite(pred_mean)) or gp_lc[pb].log_likelihood(flux) < bad_loglike_thresh:
             print("Bad fit for object", objid)
             return
 
@@ -117,13 +121,13 @@ def save_gps(light_curves, save_dir='data/saved_light_curves/', class_num=None, 
         saved_gp_fits = {}
         if nprocesses == 1:
             for args in args_list:
-                out = fit_gaussian_process(args)
+                out = fit_gaussian_process_one_argument(args)
                 if out is not None:
                     gp_lc, objid = out
                     saved_gp_fits[objid] = gp_lc
         else:
             pool = mp.Pool(nprocesses)
-            results = pool.map_async(fit_gaussian_process, args_list)
+            results = pool.map_async(fit_gaussian_process_one_argument, args_list)
             pool.close()
             pool.join()
 
