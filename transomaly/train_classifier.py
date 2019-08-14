@@ -6,55 +6,21 @@ from keras.models import Sequential
 from keras.models import load_model
 from keras.layers import Dense, Input
 from keras.layers import LSTM, GRU
-from keras.layers import Dropout, BatchNormalization, Activation, TimeDistributed
+from keras.layers import Dropout, BatchNormalization, Activation, TimeDistributed, Masking
 import keras.backend as K
 
-from transomaly.prepare_arrays import PrepareTrainingSetArrays
-from transomaly.fit_gaussian_processes import get_data, save_gps
+from transomaly.prepare_training_set import PrepareTrainingSetArrays
+from transomaly.fit_gaussian_processes import save_gps
+from transomaly.get_training_data import get_data
+from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_squared_error_over_error
 
 COLPB = {'g': 'tab:green', 'r': 'tab:red'}
 MARKPB = {'g': 'o', 'r': 's', 'z': 'd'}
 ALPHAPB = {'g': 0.3, 'r': 1., 'z': 1}
 
 
-def chisquare_loss():
-    """ Compute chi-squared in form of a keras loss function that takes in uncertatinties. """
-
-    def loss(y_true, y_pred):
-        y_err = y_true[:, :, 2:4]
-        y_t = y_true[:, :, 0:2]
-        y_p = y_pred[:, :, 0:2]
-        return K.sum(K.square((y_p - y_t)/y_err), axis=-1)
-
-    return loss
-
-
-def mean_squared_error():
-    """ Compute mean squared in form of a keras loss function. """
-
-    def loss(y_true, y_pred):
-        y_err = y_true[:, :, 2:4]
-        y_t = y_true[:, :, 0:2]
-        y_p = y_pred[:, :, 0:2]
-        return K.mean(K.square((y_p - y_t)), axis=-1)
-
-    return loss
-
-
-def mean_squared_error_over_error():
-    """ Compute mean squared in form of a keras loss function. """
-
-    def loss(y_true, y_pred):
-        y_err = y_true[:, :, 2:4]
-        y_t = y_true[:, :, 0:2]
-        y_p = y_pred[:, :, 0:2]
-        return K.mean(K.square((y_p - y_t)/y_err), axis=-1)
-
-    return loss
-
-
 def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir='.', epochs=20, retrain=False,
-                passbands=('g', 'r'), model_change=''):
+                passbands=('g', 'r'), model_change='', reframe=False):
 
     model_name = f"keras_model_epochs{epochs}_{model_change}"
     model_filename = os.path.join(fig_dir, model_name, f"{model_name}.hdf5")
@@ -73,25 +39,36 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     else:
         model = Sequential()
 
-        model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.4, seed=42))
-        model.add(BatchNormalization())
+        model.add(Masking(mask_value=0.))
 
         model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.4, seed=42))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.4, seed=42))
+        # model.add(Dropout(0.2, seed=42))
+        # model.add(BatchNormalization())
 
         model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.4, seed=42))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.4, seed=42))
+        # model.add(Dropout(0.2, seed=42))
+        # model.add(BatchNormalization())
+        # model.add(Dropout(0.2, seed=42))
 
-        model.add(TimeDistributed(Dense(npb)))
+        if reframe is True:
+            model.add(LSTM(100))
+            # model.add(Dropout(0.2, seed=42))
+            # model.add(BatchNormalization())
+            # model.add(Dropout(0.2, seed=42))
+            model.add(Dense(npb))
+        else:
+            model.add(LSTM(100, return_sequences=True))
+            # model.add(Dropout(0.2, seed=42))
+            # model.add(BatchNormalization())
+            # model.add(Dropout(0.2, seed=42))
+            model.add(TimeDistributed(Dense(npb)))
+
         if 'chi2' in model_change:
             model.compile(loss=chisquare_loss(), optimizer='adam')
         elif 'mse_oe' in model_change:
             model.compile(loss=mean_squared_error_over_error(), optimizer='adam')
+        elif reframe is True:
+            model.compile(loss='mse', optimizer='adam')
         else:
             model.compile(loss=mean_squared_error(), optimizer='adam')
         history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=64, verbose=2)
@@ -123,9 +100,31 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     return model, model_name
 
 
-def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True):
-    nobjects, ntimesteps, npassbands = yerr_test.shape
+def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49):
+    nobjects, ntimesteps, npassbands = X_test.shape
     y_pred = model.predict(X_test)
+
+    if reframe is True:
+        X_test = X_test[::npred]
+        nobjects, ntimesteps, npassbands = X_test.shape
+        y_test = y_test.reshape(nobjects, npred, npassbands)[:,::-1,:]
+        y_pred = y_pred.reshape(nobjects, npred, npassbands)[:,::-1,:]
+        yerr_test = yerr_test.reshape(nobjects, npred, npassbands)[:,::-1,:]
+    else:
+        npred = ntimesteps
+        # test that it's only using previous data
+        plt.figure()
+        trial_X = np.copy(X_test[0:1])
+        out = model.predict(trial_X)
+        trial_X[:, -20:] = np.zeros(trial_X[:, -20:].shape)
+        out2 = model.predict(trial_X)
+        plt.plot(y_test[0, :, 0], label='original data')
+        plt.plot(out[0, :, 0], label='prediction on all data')
+        plt.plot(out2[0, :, 0], label='prediction not using last 20 time-steps')
+        plt.legend()
+        plt.savefig(os.path.join(fig_dir, model_name, "test_using_previous_timesteps_only{}".format(plot_name)))
+
+    # nsamples = 1 ##
 
     # Get reduced chi_squared
     chi2_hist = []
@@ -152,16 +151,15 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     chi2_reduced_allobjects = chi2_reduced_allobjects / ((nobjects * npassbands) - reduce_count)
     print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
     print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
-    with open(os.path.join(fig_dir, model_name, 'model_info.txt'), 'w') as file:
+    with open(os.path.join(fig_dir, model_name, f'model_info{plot_name}.txt'), 'w') as file:
         file.write(f"{model_name}\n")
         file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}\n")
         file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}\n")
     plt.figure()
-    plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 3**np.std(chi2_hist))))
+    plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 3*np.std(chi2_hist))))
     plt.legend()
     plt.xlabel("chi-squared")
-    plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution.pdf'))
-    plt.show()
+    plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution{}.pdf'.format(plot_name)))
 
     save_object_chi2 = sorted(save_object_chi2, key=lambda x: x[2])
     print(save_object_chi2[:100])
@@ -186,7 +184,7 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     #     print(idx, oid, chi2_red)
         sidx = idx * nsamples  # Assumes like samples are in order
         print("Plotting example vs time", idx, objids_test[sidx])
-        argmax = -1  #timesX_test[sidx].argmax()  # -1
+        argmax = None  #timesX_test[sidx].argmax()  # -1
 
         # Get raw light curve observations
         lc = light_curves[labels_test[sidx]][objids_test[sidx]]
@@ -202,19 +200,24 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                 plotlabeltest = "ytest:{}".format(pb) if s == 0 else ''
                 plotlabelpred = "ypred:{}".format(pb) if s == 0 else ''
                 marker = None  # MARKPB[pb] if s == 0 else None
-                ax1.plot(timesX_test[sidx+s][:argmax], y_test[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
-                         label=plotlabeltest, marker=marker, markersize=10, alpha=alpha, linestyle='-')
-                ax1.plot(timesX_test[sidx+s][:argmax], y_pred[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
-                         label=plotlabelpred, marker=marker, markersize=10, alpha=alpha, linestyle=':')
+                if reframe:
+                    ax1.plot(timesX_test[sidx + s][:-1][:argmax], X_test[sidx + s][:, pbidx][:-1][:argmax], c=COLPB[pb], lw=lw,
+                             label=plotlabeltest, marker=marker, markersize=10, alpha=alpha, linestyle='-')
+                ax1.plot(timesX_test[sidx+s][1:][-npred:][:argmax], y_test[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
+                         label=plotlabeltest, marker=None, markersize=10, alpha=alpha, linestyle='-')
+                ax1.plot(timesX_test[sidx+s][1:][-npred:][:argmax], y_pred[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
+                         label=plotlabelpred, marker='*', markersize=10, alpha=alpha, linestyle=':')
             ax1.errorbar(lc[pb]['time'].dropna(), lc[pb]['flux'].dropna(), yerr=lc[pb]['fluxErr'].dropna(),
                          fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
-            ax1.text(0.05, 0.95, f"$\chi^2 = {round(save_chi2[objids_test[idx]], 3)}$", horizontalalignment='left', verticalalignment='center', transform=ax1.transAxes)
+
             if plot_gp is True and nsamples == 1:
                 gp_lc[pb].compute(lc[pb]['time'].dropna(), lc[pb]['fluxErr'].dropna())
                 pred_mean, pred_var = gp_lc[pb].predict(lc[pb]['flux'].dropna(), timesX_test[sidx+s][:argmax], return_var=True)
                 pred_std = np.sqrt(pred_var)
                 ax1.fill_between(timesX_test[sidx+s][:argmax], pred_mean + pred_std, pred_mean - pred_std, color=COLPB[pb], alpha=0.3,
                                  edgecolor="none")
+        ax1.text(0.05, 0.95, f"$\chi^2 = {round(save_chi2[objids_test[idx]], 3)}$", horizontalalignment='left',
+                 verticalalignment='center', transform=ax1.transAxes)
 
         # Plot anomaly scores
         chi2_samples = []
@@ -238,8 +241,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         ax2.text(0.05, 0.95, f"$\chi^2 = {round(np.sum(anomaly_score_mean)/len(yt), 3)}$", horizontalalignment='left',
                  verticalalignment='center', transform=ax2.transAxes)
 
-        ax2.plot(timesX_test[sidx][:argmax][m], anomaly_score_mean, lw=3)
-        ax2.fill_between(timesX_test[sidx][:argmax][m], anomaly_score_mean + anomaly_score_std, anomaly_score_mean - anomaly_score_std, alpha=0.3, edgecolor="none")
+        ax2.plot(timesX_test[sidx][1:][-npred:][:argmax][m], anomaly_score_mean, lw=3, marker='o')
+        ax2.fill_between(timesX_test[sidx][1:][-npred:][:argmax][m], anomaly_score_mean + anomaly_score_std, anomaly_score_mean - anomaly_score_std, alpha=0.3, edgecolor="none")
 
         ax1.legend(frameon=True, fontsize=33)
         ax1.set_ylabel("Relative flux")
@@ -247,14 +250,16 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         ax2.set_xlabel("Time since trigger [days]")
         plt.tight_layout()
         fig.subplots_adjust(hspace=0)
-
-        plt.savefig(os.path.join(fig_dir, model_name, f"lc_{objids_test[sidx]}_{idx}.pdf"))
+        plt.savefig(os.path.join(fig_dir, model_name, f"lc_{objids_test[sidx]}_{idx}{plot_name}.pdf"))
         plt.close()
 
     print(model_name)
     print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
     print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
 
+
+def similarity_metric(model, ):
+    pass
 
 def main():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -266,13 +271,15 @@ def main():
     contextual_info = ()
     nprocesses = None
     class_nums = (1,)
-    otherchange = 'singleobject_1_99285690_extrapolatedgp'  #'5050testvalidation' #
-    nsamples = 5000
-    extrapolate_gp = False
+    otherchange = '8020split'  # 'singleobject_1_50075859_gp_samples_extrapolated_gp'  # '8020split' #  #'5050testvalidation' #
+    nsamples = 1  # 5000
+    extrapolate_gp = True
     redo = False
-    train_epochs = 5
+    train_epochs = 1000
     retrain = False
-    nn_architecture_change = 'mse'  # 'chi2'  # 'mse'
+    reframe_problem = False
+    npred = 49
+    nn_architecture_change = 'unnormalised_{}mse_predict_last{}_timesteps_nodropout_100lstmneurons'.format('reframe_Xy_' if reframe_problem else '', npred)  # 'normalise_mse_withmasking_1000lstmneurons'  # 'chi2'  # 'mse'
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):
@@ -281,16 +288,25 @@ def main():
     preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo)
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp)
+        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp, reframe=reframe_problem, npred=npred)
 
     model, model_name = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs,
-                        retrain=retrain, passbands=passbands, model_change=nn_architecture_change)
+                        retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem)
 
     plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred)
 
+    plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred)
     #X_train, y_train, timesX_train, yerr_train, labels_train, objids_train
     #X_test, y_test, timesX_test, yerr_test, labels_test, objids_test
+
+    # Test on other classes  #51,60,62,70 AndOtherTypes
+    X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
+    timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
+        preparearrays.make_training_set(class_nums=(51,60,62,70), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred)
+    plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred)
 
 
 if __name__ == '__main__':
