@@ -4,7 +4,7 @@ def get_sntypes():
     sntypes_map = {1: 'SNIa-norm',
                    11: 'SNIa-norm',
                    2: 'SNII',
-                   12: 'SNIIpca',
+                   12: 'SNII',
                    14: 'SNIIn',
                    3: 'SNIbc',
                    13: 'SNIbc',

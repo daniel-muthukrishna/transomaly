@@ -190,4 +190,5 @@ if __name__ == '__main__':
                                                'ZTF19aadnmgf',  # SNIa
                                                'ZTF18acmzpbf',  # SNIa
                                                'ZTF19aakzwao',  # SNIa
-                                               ], figdir='transomaly')
+                                               'ZTF19abplzzk'
+                                               ], figdir='real_ZTF_objects')
