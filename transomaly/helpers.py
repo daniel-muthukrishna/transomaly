@@ -23,7 +23,7 @@ def get_sntypes():
                    70: 'AGN',
                    80: 'RRLyrae',
                    81: 'Mdwarf',
-                   83: 'EBE',
+                   83: 'Eclip. Bin.',
                    84: 'Mira',
                    90: 'uLens-BSR',
                    91: 'uLens-1STAR',

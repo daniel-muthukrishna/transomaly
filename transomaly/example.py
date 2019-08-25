@@ -1,4 +1,4 @@
-from transomaly.get_anomaly_scores import TransientRegressor
+from transomaly.get_anomaly_scores import TransientRegressor, GetAllTransientRegressors
 
 
 def main(graph=None, model=None):
@@ -41,12 +41,17 @@ def main(graph=None, model=None):
 
     light_curve_list = [(mjd, flux, fluxerr, passband, photflag, ra, dec, objid, redshift, mwebv)]
 
-    regressor = TransientRegressor()
+    regressor = TransientRegressor(nsamples=100)
     predictions, time_steps, objids = regressor.get_regressor_predictions(light_curve_list, return_predictions_at_obstime=False)
-    anomaly_scores, anomaly_scores_std, objids = regressor.get_anomaly_scores(predictions)
-    print(predictions)
+    # anomaly_scores, anomaly_scores_std, objids = regressor.get_anomaly_scores(return_predictions_at_obs_time=False)
+    # print(anomaly_scores)
+    # print(predictions)
     regressor.plot_anomaly_scores(fig_dir='.')
 
+    many_regressors = GetAllTransientRegressors(model_classes='all', nsamples=1)
+    predictions, time_steps, objids = many_regressors.get_regressor_predictions(light_curve_list, return_predictions_at_obstime=True)
+    anomaly_scores, anomaly_scores_std, objids = many_regressors.get_anomaly_scores(return_predictions_at_obstime=True)
+    many_regressors.plot_anomaly_scores_all_models(anomaly_scores, time_steps, indexes_to_plot=None, fig_dir='.', plot_animation=False)
 
 
 if __name__ == '__main__':

@@ -210,7 +210,7 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                 ax1.plot(timesX_test[sidx+s][1:][-npred:][:argmax], y_test[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
                          label=plotlabeltest, marker=None, markersize=10, alpha=alpha, linestyle='-')
                 ax1.plot(timesX_test[sidx+s][1:][-npred:][:argmax], y_pred[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
-                         label=plotlabelpred, marker='*', markersize=10, alpha=alpha, linestyle=':')
+                         label=plotlabelpred, marker=None, markersize=10, alpha=alpha, linestyle=':')
             ax1.errorbar(lc[pb]['time'].dropna(), lc[pb]['flux'].dropna(), yerr=lc[pb]['fluxErr'].dropna(),
                          fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
 
@@ -277,7 +277,7 @@ def similarity_metric(model, X_test, y_test, yerr_test, labels_test, objids_test
         # Get anomaly scores
         chi2_samples = []
         for s in range(nsamples):
-            chi2 = 0
+            chi2 = np.zeros(ntimesteps)
             npb = 0
             for pbidx in range(npassbands):
                 m = yerr_test[sidx + s, :, pbidx][:argmax] != 0  # ignore zeros (where no data exists)
@@ -307,7 +307,7 @@ def similarity_metric(model, X_test, y_test, yerr_test, labels_test, objids_test
     return similarity_score, similarity_score_std
 
 
-def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesses, extrapolate_gp, nsamples, fig_dir):
+def get_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesses, extrapolate_gp, nsamples, ignore_class_names_test_on=[]):
 
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
@@ -321,13 +321,13 @@ def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesse
             print("No model found at", model_filepath)
             continue
 
-        saved_scores_fp = os.path.join(os.path.dirname(model_filepath), 'similarity_scores.json')
+        saved_scores_fp = os.path.join(os.path.dirname(model_filepath), f'similarity_scores_{class_nums}.json')
 
         if os.path.exists(saved_scores_fp):
             print("Using saved similarity scores")
             with open(saved_scores_fp, 'r') as fp:
                 similarity_score = json.load(fp)
-            with open(saved_scores_fp.replace('.json', '_std.json'), 'r') as fp:
+            with open(saved_scores_fp.replace('similarity_scores_', 'similarity_scores_std_'), 'r') as fp:
                 similarity_score_std = json.load(fp)
         else:
             print("Saving similarity scores...")
@@ -342,7 +342,7 @@ def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesse
                                                                        objids_test, nsamples)
             with open(saved_scores_fp, 'w') as fp:
                 json.dump(similarity_score, fp)
-            with open(saved_scores_fp.replace('.json', '_std.json'), 'w') as fp:
+            with open(saved_scores_fp.replace('similarity_scores_', 'similarity_scores_std_'), 'w') as fp:
                 json.dump(similarity_score_std, fp)
 
         similarity_matrix[class_name] = similarity_score
@@ -356,17 +356,55 @@ def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesse
 
     print(similarity_matrix)
 
-    # Plotting
+    similarity_matrix = similarity_matrix.drop(ignore_class_names_test_on)
+
+    return similarity_matrix, similarity_matrix_std
+
+
+
+def plot_similarity_scatter_plot(similarity_matrix):
+    font = {'family': 'normal',
+            'size': 10}
+    matplotlib.rc('font', **font)
+    CLASS_COLOR = {'SNIa-norm': 'tab:green', 'SNIbc': 'tab:orange', 'SNII': 'tab:blue', 'SNIIn': 'blue',
+                   'SNIa-91bg': 'tab:red', 'SNIa-x': 'tab:purple', 'point-Ia': 'tab:brown', 'Kilonova': '#aaffc3',
+                   'SLSN-I': 'tab:olive', 'PISN': 'tab:cyan', 'ILOT': '#FF1493', 'CART': 'navy', 'TDE': 'tab:pink',
+                   'AGN': 'bisque'}
+
+    xrange, yrange = similarity_matrix.shape
+
+    # similarity_matrix = np.log(similarity_matrix)
+    # similarity_matrix=(similarity_matrix-similarity_matrix.min())/(similarity_matrix.max()-similarity_matrix.min())
+    fig, ax = plt.subplots()
+    for j in range(yrange):
+        yname = similarity_matrix.columns.values[j]
+        for i in range(xrange):
+            xname = similarity_matrix.index.values[i]
+            xplot, yplot = similarity_matrix[yname][xname], j
+            plt.scatter(xplot, yplot, s=100, color=CLASS_COLOR[xname])
+            plt.annotate(xname, xy=(xplot, yplot), fontsize=10)
+    ax.yaxis.set_major_locator(plt.MaxNLocator(yrange))
+    ax.set_yticklabels(np.insert(similarity_matrix.columns.values, 0, 0))
+    # ax.xaxis.set_major_formatter(plt.NullFormatter())
+    plt.show()
+
+
+
+
+def plot_similarity_matrix(similarity_matrix, similarity_matrix_std):
     font = {'family': 'normal',
             'size': 36}
     matplotlib.rc('font', **font)
 
     xrange, yrange = similarity_matrix.shape
-    xlabels = similarity_matrix.index.values
-    ylabels = similarity_matrix.columns.values
     similarity_matrix = similarity_matrix.T
+    similarity_matrix = similarity_matrix[
+        ['SNIa', 'SNIa-x', 'SNII', 'SNIbc', 'SLSN-I', 'TDE', 'AGN', 'SNIIn', 'Ia-91bg', 'CART', 'TDE', 'PISN',
+         'Kilonova']]
+    xlabels = similarity_matrix.columns.values
+    ylabels = similarity_matrix.index.values
 
-    maxval = 100  # similarity_matrix.values.max()
+    maxval = min(20, similarity_matrix.values.max())
     plt.figure(figsize=(15,12))
     plt.imshow(similarity_matrix, cmap=plt.cm.RdBu_r, vmin=0, vmax=maxval)#, norm=colors.LogNorm())
 
@@ -379,19 +417,23 @@ def plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesse
     thresh_q1 = 0.25 * maxval
     for i in range(xrange):
         for j in range(yrange):
-            print(i, j)
             c = similarity_matrix.iloc[j, i]
             if c > 100:
                 cell_text = f"{c:.0f}"
+            elif c > 10:
+                cell_text = f"{c:.1f}"
             else:
                 cell_text = f"{c:.2f}"
             plt.text(i, j, cell_text, va='center', ha='center',
-                     color="white" if c < thresh_q1 or c > thresh_q3 else "black", fontsize=13)
+                     color="white" if c < thresh_q1 or c > thresh_q3 else "black", fontsize=14)
 
     plt.ylabel('Trained on')
     plt.xlabel('Tested on')
     plt.tight_layout()
+    print("Saving matrix plot...")
     plt.savefig("similarity_matrix.pdf")
+
+
 
 
 def main():
@@ -408,7 +450,7 @@ def main():
     nsamples = 1  # 5000
     extrapolate_gp = True
     redo = False
-    train_epochs = 1000
+    train_epochs = 150
     retrain = False
     reframe_problem = False
     npred = 49
@@ -440,14 +482,45 @@ def main():
                  fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred)
 
 
-    # class_nums = (51, 60, 62, 70)  # (1, 41, 51, 60, 64, 70)
-    # model_filepaths = {'SNIa': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(1,)/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5',
-    #                    'SNII': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(2, 12, 14)/keras_model_epochs100_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs100_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5',
-    #                    'Kilonovae': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(51,)/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5',
-    #                    'AGN': '/Users/danmuth/PycharmProjects/transomaly/plots/model_8020split_ci()_ns1_c(70,)/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs200_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'}
-    #
-    # plot_similarity_matrix(class_nums, model_filepaths, preparearrays, nprocesses, extrapolate_gp, nsamples, fig_dir='.')
-
+    # class_nums_test_on = (1, 2, 12, 14, 3, 13, 41, 43, 51, 60, 61, 62, 63, 64, 70)  # , 80, 81, 83)
+    # ignore_class_names_test_on = []  # ignore_test_on class_names
+    # model_filepaths = {'SNIa': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(1,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    'SNIa-x': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(43,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'Ia-91bg': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(41,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    'SNII': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(2, 12, 14)/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    'SNIbc': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(3, 13)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'Kilonovae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(51,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    'SLSN-I': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(60,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'PISN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(61,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'ILOT': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(62,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'CART': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(63,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    'TDE': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(64,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    'AGN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(70,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'RRLyrae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(80,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'Mdwarf': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(81,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    # 'Eclip. Bin.': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(83,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+    #                    }
+    # similarity_matrix, similarity_matrix_std = get_similarity_matrix(class_nums_test_on, model_filepaths, preparearrays, nprocesses, extrapolate_gp, nsamples, ignore_class_names_test_on)
+    # plot_similarity_matrix(similarity_matrix, similarity_matrix_std)
+    # # plot_similarity_scatter_plot(similarity_matrix)
 
 if __name__ == '__main__':
     main()
+
+
+# {'SNIa-norm': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(1,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        'SNII': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(2, 12, 14)/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        'SNIbc': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(3, 13)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        'SNIa-91bg': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(41,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        'SNIa-x': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(43,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        # 'Kilonovae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(51,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        'SLSN-I': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(60,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        # 'PISN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(61,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        # 'ILOT': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(62,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        # 'CART': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(63,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        'TDE': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(64,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        'AGN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(70,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        # 'RRLyrae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(80,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        # 'Mdwarf': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(81,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        # 'Eclip. Bin.': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(83,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
+#                        }
