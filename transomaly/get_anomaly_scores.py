@@ -404,7 +404,7 @@ class GetAllTransientRegressors(object):
                     chi2_cumsum += anomaly_scores[c][idx][t]
                     a_scores[c][t] = chi2_cumsum / len_t
             a_scores = pd.DataFrame(a_scores)
-            a_scores = np.exp(-a_scores/2)
+            a_scores = np.exp(-a_scores**2/2)
 
             ax1.legend()
             ax1.set_ylabel('Relative flux')
