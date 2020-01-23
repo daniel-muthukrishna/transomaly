@@ -49,13 +49,13 @@ class PrepareArrays(object):
 
     def update_X(self, X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, contextual_info, otherinfo, nsamples=10):
 
+        # Drop infinite values
+        lc.replace([np.inf, -np.inf], np.nan)
+
         for j, pb in enumerate(self.passbands):
             if pb not in lc:
                 print("No", pb, "in objid:", objid)
                 continue
-
-            # Drop infinite values
-            lc.replace([np.inf, -np.inf], np.nan)
 
             # Get data
             time = lc[pb]['time'][0:self.nobs].dropna().values
@@ -93,4 +93,4 @@ class PrepareArrays(object):
             for jj, c_idx in enumerate(contextual_info, 1):
                 X[idx + ns][j + jj][0:len_t] = otherinfo[c_idx] * np.ones(len_t)
 
-        return X
+        return X, Xerr

@@ -40,7 +40,7 @@ class PrepareInputArrays(PrepareArrays):
         nrows = nobjects * nsamples
 
         X = np.zeros(shape=(nrows, self.nfeatures, self.nobs))
-        Xerr = np.zeros(shape=(nrows, self.nfeatures, self.nobs))
+        Xerr = np.zeros(shape=(nrows, self.npb, self.nobs))
         timesX = np.zeros(shape=(nrows, self.nobs))
         objids = []
         trigger_mjds = []
@@ -61,7 +61,7 @@ class PrepareInputArrays(PrepareArrays):
                 timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
                 trigger_mjds.append(trigger_mjd)
-            X = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
+            X, Xerr = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
 
         # Correct shape for keras is (N_objects, N_timesteps, N_passbands) (where N_timesteps is lookback time)
         X = X.swapaxes(2, 1)

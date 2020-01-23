@@ -50,7 +50,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
         # Xerr = np.memmap(os.path.join(self.training_set_dir, 'Xerr_lc_data.dat'), dtype=np.float32, mode='w+',
         #               shape=(nrows, self.nfeatures, self.nobs))
         X = np.zeros(shape=(nrows, self.nfeatures, self.nobs))
-        Xerr = np.zeros(shape=(nrows, self.nfeatures, self.nobs))
+        Xerr = np.zeros(shape=(nrows, self.npb, self.nobs))
         timesX = np.zeros(shape=(nrows, self.nobs))
         objids = []
 
@@ -70,7 +70,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
                 timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
                 labels[idx + ns] = int(objid.split('_')[0])
-            X = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
+            X, Xerr = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
 
         # Count nobjects per class
         classes = sorted(list(set(labels)))
@@ -137,6 +137,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
         X_test = X_test.swapaxes(2, 1)  # Correct shape for keras is (N_objects, N_timesteps, N_passbands)
         Xerr_test = Xerr_test.swapaxes(2, 1)
 
+        # ##
         # # Normalise light curves
         # nobjects, ntimesteps, npassbands = X_train.shape
         # X_train_normalised = np.zeros(X_train.shape)
@@ -172,6 +173,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
         # X_test = X_test_normalised
         # Xerr_train = Xerr_train_normalised
         # Xerr_test = Xerr_test_normalised
+        # ##
 
         if reframe is True:
             # Reframe X and y
