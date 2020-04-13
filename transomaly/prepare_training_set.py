@@ -9,7 +9,7 @@ from transomaly.prepare_arrays import PrepareArrays
 
 
 class PrepareTrainingSetArrays(PrepareArrays):
-    def __init__(self, passbands=('g', 'r'), contextual_info=(0,), data_dir='data/ZTF_20190512/',
+    def __init__(self, passbands=('g', 'r'), contextual_info=('redshift',), data_dir='data/ZTF_20190512/',
                  save_dir='data/saved_light_curves/', training_set_dir='data/training_set_files/', redo=False):
         PrepareArrays.__init__(self, passbands, contextual_info)
         self.passbands = passbands
@@ -60,8 +60,10 @@ class PrepareTrainingSetArrays(PrepareArrays):
                 print(i, nobjects)
             lc = light_curves[objid]
 
-            otherinfo = lc['otherinfo'].values.flatten()
-            # redshift, b, mwebv, trigger_mjd, t0, peakmjd = otherinfo[0:6]
+            redshift = lc.meta['redshift']
+            b = lc.meta['b']
+            mwebv = lc.meta['mwebv']
+            trigger_mjd = lc.meta['trigger_mjd']
 
             # TODO: make cuts
 
@@ -70,7 +72,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
                 timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
                 labels[idx + ns] = int(objid.split('_')[0])
-            X, Xerr = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
+            X, Xerr = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, lc.meta, nsamples)
 
         # Count nobjects per class
         classes = sorted(list(set(labels)))
@@ -234,13 +236,13 @@ class PrepareTrainingSetArrays(PrepareArrays):
             Xerr_test = Xerr_test[:, :-1]
             # timesX_test = timesX_test[:, :-1]
 
-            # Add errors as extra column to y
-            ye_train = np.copy(yerr_train)
-            ye_test = np.copy(yerr_test)
-            ye_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
-            ye_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
-            y_train = np.dstack((y_train, ye_train))
-            y_test = np.dstack((y_test, ye_test))
+            # # Add errors as extra column to y
+            # ye_train = np.copy(yerr_train)
+            # ye_test = np.copy(yerr_test)
+            # ye_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
+            # ye_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
+            # y_train = np.dstack((y_train, ye_train))
+            # y_test = np.dstack((y_test, ye_test))
 
         return X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
                timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test
@@ -248,7 +250,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
 def main():
     passbands = ('g', 'r')
-    contextual_info = (0,)
+    contextual_info = ('redshift',)
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
     save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')

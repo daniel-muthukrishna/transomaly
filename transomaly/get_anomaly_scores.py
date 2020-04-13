@@ -258,6 +258,8 @@ class TransientRegressor(object):
             # ax2.axvline(x=0, color='k', linestyle='-', linewidth=1)
 
             for pbidx, pb in enumerate(self.passbands):
+                pbmask = lc['passband'] == pb
+
                 for s in range(self.nsamples):
                     lw = 3 if s == 0 else 0.5
                     alpha = 1 if s == 0 else 0.1
@@ -266,11 +268,17 @@ class TransientRegressor(object):
                     marker = None  # MARKPB[pb] if s == 0 else None
                     ax1.plot(self.timesX[sidx + s][1:][:argmax], self.y[sidx + s][:, pbidx][:argmax], c=COLPB[pb], lw=lw, label=plotlabeltest, marker=None, markersize=10, alpha=alpha, linestyle='-')
                     ax1.plot(self.timesX[sidx + s][1:][:argmax], self.y_predict[sidx + s][:, pbidx][:argmax], c=COLPB[pb], lw=lw, label=plotlabelpred, marker=None, markersize=10, alpha=alpha, linestyle=':')
-                ax1.errorbar(lc[pb]['time'].dropna(), lc[pb]['flux'].dropna(), yerr=lc[pb]['fluxErr'].dropna(),
+
+                sortedidx = np.argsort(lc[pbmask]['time'].data)
+                time = lc[pbmask]['time'].data[sortedidx]
+                flux = lc[pbmask]['flux'].data[sortedidx]
+                fluxerr = lc[pbmask]['fluxErr'].data[sortedidx]
+
+                ax1.errorbar(time, flux, yerr=fluxerr,
                              fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
 
-                gp_lc[pb].compute(lc[pb]['time'].dropna(), lc[pb]['fluxErr'].dropna())
-                pred_mean, pred_var = gp_lc[pb].predict(lc[pb]['flux'].dropna(), self.timesX[sidx + s][:argmax],
+                gp_lc[pb].compute(time, fluxerr)
+                pred_mean, pred_var = gp_lc[pb].predict(flux, self.timesX[sidx + s][:argmax],
                                                         return_var=True)
                 pred_std = np.sqrt(pred_var)
                 ax1.fill_between(self.timesX[sidx + s][:argmax], pred_mean + pred_std, pred_mean - pred_std,
@@ -427,12 +435,14 @@ class GetAllTransientRegressors(object):
 
             def animate(ani_i):
                 for pbidx, pb in enumerate(self.passbands):
+                    pbmask = lc['passband'] == pb
+
                     if ani_i + 1 >= len(time_steps[idx]):
                         break
 
-                    dea = [lc[pb]['time'].dropna().values < time_steps[idx][int(ani_i + 1)]]
+                    dea = [lc[pbmask]['time'].data < time_steps[idx][int(ani_i + 1)]]
 
-                    ax1.errorbar(lc[pb]['time'].dropna().values[dea], lc[pb]['flux'].dropna().values[dea], yerr=lc[pb]['fluxErr'].dropna().values[dea],
+                    ax1.errorbar(lc[pbmask]['time'].data[dea], lc[pb]['flux'].data[dea], yerr=lc[pb]['fluxErr'].data[dea],
                                  fmt="o", color=COLPB[pb], label=pb, markersize='10', capsize=4, elinewidth=4)
                 ax2.clear()
                 ax2.set_ylim(a_scores.values.min(), a_scores.values.max())

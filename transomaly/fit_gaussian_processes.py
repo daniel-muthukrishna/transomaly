@@ -35,9 +35,12 @@ def fit_gaussian_process(lc, objid, passbands, plot, extrapolate, bad_loglike_th
     kernel = terms.Matern32Term(log_sigma=5., log_rho=3.)
     times, fluxes, fluxerrs = {}, {}, {}
     for pbidx, pb in enumerate(passbands):
-        times[pb] = lc[pb]['time'].dropna()
-        fluxes[pb] = lc[pb]['flux'].dropna()
-        fluxerrs[pb] = lc[pb]['fluxErr'].dropna()
+        pbmask = lc['passband'] == pb
+
+        sortedidx = np.argsort(lc[pbmask]['time'].data)
+        times[pb] = lc[pbmask]['time'].data[sortedidx]
+        fluxes[pb] = lc[pbmask]['flux'].data[sortedidx]
+        fluxerrs[pb] = lc[pbmask]['fluxErr'].data[sortedidx]
 
         gp_lc[pb] = celerite.GP(kernel)
         gp_lc[pb].compute(times[pb], fluxerrs[pb])
@@ -150,7 +153,7 @@ def main():
     class_num = 1
     extrapolate = True
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
+    data_dir = os.path.join(SCRIPT_DIR, '', 'data/ZTF_20190512')
     save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
 
     light_curves = get_data(class_num, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, redo=False)

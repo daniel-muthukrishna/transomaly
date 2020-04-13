@@ -129,7 +129,6 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     return model, model_name, sess
 
 
-
 def main():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
@@ -137,10 +136,10 @@ def main():
     training_set_dir = os.path.join(SCRIPT_DIR, '..', 'data/training_set_files')
     fig_dir = os.path.join(SCRIPT_DIR, '..', 'plots')
     passbands = ('g', 'r')
-    contextual_info = ()
+    contextual_info = ('redshift',)
     nprocesses = None
     class_nums = (1,)
-    otherchange = '8020split'  # 'singleobject_1_50075859_gp_samples_extrapolated_gp'  # '8020split' #  #'5050testvalidation' #
+    otherchange = ''  # 'singleobject_1_50075859_gp_samples_extrapolated_gp'  # '8020split' #  #'5050testvalidation' #
     nsamples = 1  # 5000
     extrapolate_gp = True
     redo = False
@@ -148,7 +147,7 @@ def main():
     retrain = False
     reframe_problem = False
     npred = 49
-    probabilistic = True
+    probabilistic = False
     nn_architecture_change = '{}unnormalised_{}negloglike_predict_last{}_timesteps_nodropout_100lstmneurons'.format('probabilistic_' if probabilistic else '', 'reframe_Xy_' if reframe_problem else '', npred)  # 'normalise_mse_withmasking_1000lstmneurons'  # 'chi2'  # 'mse'
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
@@ -172,7 +171,7 @@ def main():
     # Test on other classes  #51,60,62,70 AndOtherTypes
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums=(51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred)
+        preparearrays.make_training_set(class_nums=(1,51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred)
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
                  fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess)
 

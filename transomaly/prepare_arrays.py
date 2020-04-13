@@ -2,7 +2,7 @@ import numpy as np
 
 
 class PrepareArrays(object):
-    def __init__(self, passbands=('g', 'r'), contextual_info=(0,)):
+    def __init__(self, passbands=('g', 'r'), contextual_info=('redshift',)):
         self.passbands = passbands
         self.contextual_info = contextual_info
         self.nobs = 50
@@ -17,9 +17,9 @@ class PrepareArrays(object):
         mintimes = []
         maxtimes = []
         for j, pb in enumerate(self.passbands):
-            if pb not in lc:
-                continue
-            time = lc[pb]['time'][0:self.nobs].dropna()
+            pbmask = lc['passband'] == pb
+
+            time = lc[pbmask]['time'][0:self.nobs].data
             mintimes.append(time.min())
             maxtimes.append(time.max())
         mintime = min(mintimes)
@@ -47,21 +47,19 @@ class PrepareArrays(object):
 
         return tinterp, len_t
 
-    def update_X(self, X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, contextual_info, otherinfo, nsamples=10):
+    def update_X(self, X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, contextual_info, meta_data, nsamples=10):
 
-        # Drop infinite values
-        lc.replace([np.inf, -np.inf], np.nan)
+        # # Drop infinite values
+        # lc.replace([np.inf, -np.inf], np.nan)
 
         for j, pb in enumerate(self.passbands):
-            if pb not in lc:
-                print("No", pb, "in objid:", objid)
-                continue
+            pbmask = lc['passband'] == pb
 
             # Get data
-            time = lc[pb]['time'][0:self.nobs].dropna().values
-            flux = lc[pb]['flux'][0:self.nobs].dropna().values
-            fluxerr = lc[pb]['fluxErr'][0:self.nobs].dropna().values
-            photflag = lc[pb]['photflag'][0:self.nobs].dropna().values
+            time = lc[pbmask]['time'][0:self.nobs].data
+            flux = lc[pbmask]['flux'][0:self.nobs].data
+            fluxerr = lc[pbmask]['fluxErr'][0:self.nobs].data
+            photflag = lc[pbmask]['photflag'][0:self.nobs].data
 
             # Mask out times outside of mintime and maxtime
             timemask = (time > self.mintime) & (time < self.maxtime)
@@ -90,7 +88,7 @@ class PrepareArrays(object):
 
         # Add contextual information
         for ns in range(nsamples):
-            for jj, c_idx in enumerate(contextual_info, 1):
-                X[idx + ns][j + jj][0:len_t] = otherinfo[c_idx] * np.ones(len_t)
+            for jj, c_info in enumerate(contextual_info, 1):
+                X[idx + ns][j + jj][0:len_t] = meta_data[c_info] * np.ones(len_t)
 
         return X, Xerr

@@ -41,7 +41,8 @@ def plot_history(history, model_filename):
 
 
 def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, tf_sess=None):
-    nobjects, ntimesteps, npassbands = X_test.shape
+    nobjects, ntimesteps, nfeatures = X_test.shape
+    npassbands = len(passbands)
 
     if probabilistic:
         X_test = np.asarray(X_test, np.float32)
@@ -144,6 +145,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(13, 15), sharex=True)
 
         for pbidx, pb in enumerate(passbands):
+            pbmask = lc['passband'] == pb
+
             for s in range(nsamples):
                 lw = 3 if s == 0 else 0.5
                 alpha = 1 if s == 0 else 0.1
@@ -163,12 +166,12 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                              label=plotlabelpred, marker='*', markersize=10, alpha=alpha, linestyle=':')
 
         #Normalised so commented out. Uncomment for unnormalised
-            ax1.errorbar(lc[pb]['time'].dropna(), lc[pb]['flux'].dropna(), yerr=lc[pb]['fluxErr'].dropna(),
+            ax1.errorbar(lc[pbmask]['time'].data, lc[pbmask]['flux'].data, yerr=lc[pbmask]['fluxErr'].data,
                          fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
 
             if plot_gp is True and nsamples == 1:
-                gp_lc[pb].compute(lc[pb]['time'].dropna(), lc[pb]['fluxErr'].dropna())
-                pred_mean, pred_var = gp_lc[pb].predict(lc[pb]['flux'].dropna(), timesX_test[sidx+s][:argmax], return_var=True)
+                gp_lc[pb].compute(lc[pbmask]['time'].data, lc[pbmask]['fluxErr'].data)
+                pred_mean, pred_var = gp_lc[pb].predict(lc[pbmask]['flux'].data, timesX_test[sidx+s][:argmax], return_var=True)
                 pred_std = np.sqrt(pred_var)
                 ax1.fill_between(timesX_test[sidx+s][:argmax], pred_mean + pred_std, pred_mean - pred_std, color=COLPB[pb], alpha=0.3,
                                  edgecolor="none")

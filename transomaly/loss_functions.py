@@ -13,6 +13,10 @@ def chisquare_loss():
     return loss
 
 
+def negloglike():
+    negloglik = lambda y, rv_y: -rv_y.log_prob(y)
+
+
 def mean_squared_error():
     """ Compute mean squared in form of a keras loss function. """
 

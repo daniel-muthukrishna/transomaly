@@ -7,11 +7,12 @@ from transomaly.fit_gaussian_processes import fit_gaussian_process
 
 
 class PrepareInputArrays(PrepareArrays):
-    def __init__(self, passbands=('g', 'r'), contextual_info=(0,), extrapolate_gp=True):
+    def __init__(self, passbands=('g', 'r'), contextual_info=('redshift',), extrapolate_gp=True):
         PrepareArrays.__init__(self, passbands, contextual_info)
         self.passbands = passbands
         self.contextual_info = contextual_info
-        self.extrapolate_gp = extrapolate_gp
+        self.extrapolate_gp = extrapolate_gp # ΔG^0 = ΔH^0 - TΔS^0
+
         self.npb = len(passbands)
 
     def get_light_curves(self, light_curves_list):
@@ -53,15 +54,17 @@ class PrepareInputArrays(PrepareArrays):
 
             idx = i * nsamples
             lc = lcs[objid]
-            otherinfo = lc['otherinfo'].values.flatten()
-            redshift, b, mwebv, trigger_mjd = otherinfo[0:4]
+            redshift = lc.meta['redshift']
+            b = lc.meta['b']
+            mwebv = lc.meta['mwebv']
+            trigger_mjd = lc.meta['trigger_mjd']
 
             tinterp, len_t = self.get_t_interp(lc, extrapolate=self.extrapolate_gp)
             for ns in range(nsamples):
                 timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
                 trigger_mjds.append(trigger_mjd)
-            X, Xerr = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, otherinfo, nsamples)
+            X, Xerr = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, lc.meta, nsamples)
 
         # Correct shape for keras is (N_objects, N_timesteps, N_passbands) (where N_timesteps is lookback time)
         X = X.swapaxes(2, 1)
