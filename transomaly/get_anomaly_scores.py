@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from collections import OrderedDict
-from keras.models import load_model
+from tensorflow.python.keras.models import load_model
 from pkg_resources import resource_filename
 
 from transomaly.prepare_input import PrepareInputArrays
@@ -27,7 +27,7 @@ class TransientRegressor(object):
 
         self.nsamples = nsamples
         self.passbands = passbands
-        self.contextual_info = ()
+        self.contextual_info = ()  #### CHECK THIS ####
         self.npb = len(passbands)
 
         if model_filepath != '' and os.path.exists(model_filepath):
