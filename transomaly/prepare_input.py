@@ -25,14 +25,19 @@ class PrepareInputArrays(PrepareArrays):
         """ Returns dictionary of Gaussian Process fits with each object ID as a key. """
         gp_fits = {}
         for objid, lc in light_curves.items():
-            out = fit_gaussian_process(lc, objid, self.passbands, plot=False,
-                                       extrapolate=self.extrapolate_gp, bad_loglike_thresh=-np.inf)
-            if out is not None:
-                gp_lc, objid = out
-                gp_fits[objid] = gp_lc
-            else:
-                print(f"Unable to fit gaussian process to object: {objid}")
-                gp_fits[objid] = None
+            try:
+                out = fit_gaussian_process(lc, objid, self.passbands, plot=False,
+                                           extrapolate=self.extrapolate_gp, bad_loglike_thresh=-np.inf)
+            except Exception as e:
+                print(e)
+                out = None
+            finally:
+                if out is not None:
+                    gp_lc, objid = out
+                    gp_fits[objid] = gp_lc
+                else:
+                    print(f"Unable to fit gaussian process to object: {objid}")
+                    gp_fits[objid] = None
 
         return gp_fits
 
