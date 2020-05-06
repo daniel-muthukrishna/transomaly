@@ -29,6 +29,7 @@ def fit_gaussian_process_one_argument(args):
 
 
 def fit_gaussian_process(lc, objid, passbands, plot, extrapolate, bad_loglike_thresh=-380):
+    print(f"Fitting GP to {objid}")
     gp_lc = {}
     if plot:
         plt.figure()
@@ -43,8 +44,13 @@ def fit_gaussian_process(lc, objid, passbands, plot, extrapolate, bad_loglike_th
         fluxes[pb] = lc[pbmask]['flux'].data[sortedidx]
         fluxerrs[pb] = lc[pbmask]['fluxErr'].data[sortedidx]
 
-        gp_lc[pb] = celerite.GP(kernel)
-        gp_lc[pb].compute(times[pb], fluxerrs[pb])
+        try:
+            gp_lc[pb] = celerite.GP(kernel)
+            gp_lc[pb].compute(times[pb], fluxerrs[pb])
+        except Exception as e:
+            print("Failed object", objid, e)
+            return
+
         print("Initial log likelihood: {0}".format(gp_lc[pb].log_likelihood(fluxes[pb])))
         initial_params = gp_lc[pb].get_parameter_vector()  # This should be the same across passbands
         bounds = gp_lc[pb].get_parameter_bounds()

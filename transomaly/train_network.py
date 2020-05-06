@@ -148,95 +148,72 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
 
 def main():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(SCRIPT_DIR, '..', 'data/ZTF_20190512')
-    save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
-    training_set_dir = os.path.join(SCRIPT_DIR, '..', 'data/training_set_files')
-    fig_dir = os.path.join(SCRIPT_DIR, '..', 'plots')
-    get_data_func = astrorapid.get_training_data.get_data_from_snana_fits
-    passbands = ('g', 'r')
-    contextual_info = ()
-    known_redshift = True if 'redshift' in contextual_info else False
-    nprocesses = None
-    class_nums = (1,)
-    otherchange = ''  # 'singleobject_1_50075859_gp_samples_extrapolated_gp'  # '8020split' #  #'5050testvalidation' #
-    nsamples = 1  # 5000
-    extrapolate_gp = True
-    redo = False
-    train_epochs = 300
-    retrain = False
-    reframe_problem = False
-    npred = 1
-    probabilistic = False
-    train_from_last_stop = 0
-    normalise = False
+    for npred in range(1, 2):
+        SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+        data_dir = os.path.join(SCRIPT_DIR, '..', 'data/real_ZTF_data_from_osc')
+        save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_real_ZTF_light_curves')
+        training_set_dir = os.path.join(SCRIPT_DIR, '..', 'data/training_set_files')
+        fig_dir = os.path.join(SCRIPT_DIR, '..', 'plots')
+        get_data_func = astrorapid.get_training_data.get_real_ztf_training_data
+        passbands = ('g', 'r')
+        contextual_info = ()
+        known_redshift = True if 'redshift' in contextual_info else False
+        nprocesses = 1
+        class_nums = ('Ia',)
+        otherchange = ''
+        nsamples = 1
+        extrapolate_gp = True
+        redo = False
+        train_epochs = 5
+        retrain = False
+        reframe_problem = False
+        # npred = 1
+        probabilistic = False
+        train_from_last_stop = 0
+        normalise = True
+        nn_architecture_change = f"real_data_{'probabilistic_' if probabilistic else ''}predictpoint{npred}timestepsinfuture_normalised{normalise}_mse_nodropout_100lstmneurons"
 
-    nn_architecture_change = f"{'probabilistic_' if probabilistic else ''}predictpoint{npred}timestepsinfuture_normalised{normalise}_mse_nodropout_100lstmneurons"
+        fig_dir = os.path.join(fig_dir,
+                               "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
 
-    fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
+        preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo,
+                                                 get_data_func)
+        X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
+        timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
+            preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp,
+                                            reframe=reframe_problem, npred=npred, normalise=normalise)
 
-    preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo, get_data_func)
-    X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
-    timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise)
+        model, model_name, tf_sess = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test,
+                                                 fig_dir=fig_dir, epochs=train_epochs,
+                                                 retrain=retrain, passbands=passbands,
+                                                 model_change=nn_architecture_change, reframe=reframe_problem,
+                                                 probabilistic=probabilistic, train_from_last_stop=train_from_last_stop)
 
-    model, model_name, tf_sess = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs,
-                        retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop)
+        # plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
+        #             fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess)
 
-    # plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
-    #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess)
-    #
-    plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func)
+        plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train,
+                     passbands=passbands,
+                     fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses,
+                     plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set',
+                     npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift,
+                     get_data_func=get_data_func)
 
-    # Test on other classes  #51,60,62,70 AndOtherTypes
-    X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
-    timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums=(1,51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise)
-    plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func)
+        # Test on other classes  #51,60,62,70 AndOtherTypes
+        X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
+        timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
+            preparearrays.make_training_set(class_nums=(1, 51,), nsamples=1, otherchange='getKnAndOtherTypes',
+                                            nprocesses=nprocesses, extrapolate_gp=extrapolate_gp,
+                                            reframe=reframe_problem, npred=npred, normalise=normalise)
+        plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train,
+                     passbands=passbands,
+                     fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses,
+                     plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly',
+                     npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift,
+                     get_data_func=get_data_func)
 
-
-    # class_nums_test_on = (1, 2, 12, 14, 3, 13, 41, 43, 51, 60, 61, 62, 63, 64, 70)  # , 80, 81, 83)
-    # ignore_class_names_test_on = []  # ignore_test_on class_names
-    # model_filepaths = {'SNIa': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(1,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    'SNIa-x': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(43,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'Ia-91bg': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(41,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    'SNII': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(2, 12, 14)/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    'SNIbc': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(3, 13)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'Kilonovae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(51,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    'SLSN-I': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(60,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'PISN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(61,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'ILOT': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(62,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'CART': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(63,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    'TDE': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(64,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    'AGN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(70,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'RRLyrae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(80,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'Mdwarf': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(81,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    # 'Eclip. Bin.': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(83,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-    #                    }
-    # similarity_matrix, similarity_matrix_std = get_similarity_matrix(class_nums_test_on, model_filepaths, preparearrays, nprocesses, extrapolate_gp, nsamples, ignore_class_names_test_on)
-    # plot_similarity_matrix(similarity_matrix, similarity_matrix_std)
-    # # plot_similarity_scatter_plot(similarity_matrix)
 
 if __name__ == '__main__':
     main()
-
-
-# {'SNIa-norm': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(1,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        'SNII': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(2, 12, 14)/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs500_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        'SNIbc': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(3, 13)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        'SNIa-91bg': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(41,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        'SNIa-x': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(43,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        # 'Kilonovae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(51,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        'SLSN-I': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(60,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        # 'PISN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(61,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        # 'ILOT': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(62,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        # 'CART': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(63,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        'TDE': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(64,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        'AGN': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(70,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        # 'RRLyrae': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(80,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        # 'Mdwarf': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(81,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        # 'Eclip. Bin.': os.path.join(SCRIPT_DIR, '..', 'plots', 'model_8020split_ci()_ns1_c(83,)/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons/keras_model_epochs1000_unnormalised_mse_predict_last49_timesteps_nodropout_100lstmneurons.hdf5'),
-#                        }

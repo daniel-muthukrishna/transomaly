@@ -73,7 +73,11 @@ class PrepareArrays(object):
                 continue
 
             # Draw samples from GP
-            gp_lc[pb].compute(time, fluxerr)
+            try:
+                gp_lc[pb].compute(time, fluxerr)
+            except Exception as e:
+                print(f"ERROR FOR OBJECT: {objid}", e)
+                continue
             pred_mean, pred_var = gp_lc[pb].predict(flux, tinterp, return_var=True)
             pred_std = np.sqrt(pred_var)
             if nsamples > 1:
