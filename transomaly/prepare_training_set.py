@@ -82,7 +82,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
         return X, Xerr, timesX, labels, objids
 
-    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49):
+    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49, normalise=False):
         savepath = os.path.join(self.training_set_dir, "X_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums))
 
         if self.redo is True or not os.path.isfile(savepath):
@@ -139,43 +139,45 @@ class PrepareTrainingSetArrays(PrepareArrays):
         X_test = X_test.swapaxes(2, 1)  # Correct shape for keras is (N_objects, N_timesteps, N_passbands)
         Xerr_test = Xerr_test.swapaxes(2, 1)
 
-        # ##
-        # # Normalise light curves
-        # nobjects, ntimesteps, npassbands = X_train.shape
-        # X_train_normalised = np.zeros(X_train.shape)
-        # Xerr_train_normalised = np.zeros(Xerr_train.shape)
-        # for i in range(nobjects):
-        #     for pbidx in range(npassbands):
-        #         flux = X_train[i, :, pbidx]
-        #         fluxerr = Xerr_train[i, :, pbidx]
-        #         minflux = min(flux)
-        #         maxflux = max(flux)
-        #         if maxflux - minflux == 0:
-        #             norm = 1
-        #         else:
-        #             norm = maxflux - minflux
-        #         X_train_normalised[i, :, pbidx] = (flux - minflux)/norm
-        #         Xerr_train_normalised[i, :, pbidx] = fluxerr / norm
-        # nobjects, ntimesteps, npassbands = X_test.shape
-        # X_test_normalised = np.zeros(X_test.shape)
-        # Xerr_test_normalised = np.zeros(Xerr_test.shape)
-        # for i in range(nobjects):
-        #     for pbidx in range(npassbands):
-        #         flux = X_test[i, :, pbidx]
-        #         fluxerr = Xerr_test[i, :, pbidx]
-        #         minflux = min(flux)
-        #         maxflux = max(flux)
-        #         if maxflux - minflux == 0:
-        #             norm = 1
-        #         else:
-        #             norm = maxflux - minflux
-        #         X_test_normalised[i, :, pbidx] = (flux - minflux)/norm
-        #         Xerr_test_normalised[i, :, pbidx] = fluxerr / norm
-        # X_train = X_train_normalised
-        # X_test = X_test_normalised
-        # Xerr_train = Xerr_train_normalised
-        # Xerr_test = Xerr_test_normalised
-        # ##
+        #
+        # Normalise light curves
+        if normalise:
+            nobjects, ntimesteps, nfeatures = X_train.shape
+            npassbands = len(self.passbands)
+            X_train_normalised = np.zeros(X_train.shape)
+            Xerr_train_normalised = np.zeros(Xerr_train.shape)
+            for i in range(nobjects):
+                for pbidx in range(npassbands):
+                    flux = X_train[i, :, pbidx]
+                    fluxerr = Xerr_train[i, :, pbidx]
+                    minflux = min(flux)
+                    maxflux = max(flux)
+                    if maxflux - minflux == 0:
+                        norm = 1
+                    else:
+                        norm = maxflux - minflux
+                    X_train_normalised[i, :, pbidx] = (flux - minflux)/norm
+                    Xerr_train_normalised[i, :, pbidx] = fluxerr / norm
+            nobjects, ntimesteps, nfeatures = X_test.shape
+            X_test_normalised = np.zeros(X_test.shape)
+            Xerr_test_normalised = np.zeros(Xerr_test.shape)
+            for i in range(nobjects):
+                for pbidx in range(npassbands):
+                    flux = X_test[i, :, pbidx]
+                    fluxerr = Xerr_test[i, :, pbidx]
+                    minflux = min(flux)
+                    maxflux = max(flux)
+                    if maxflux - minflux == 0:
+                        norm = 1
+                    else:
+                        norm = maxflux - minflux
+                    X_test_normalised[i, :, pbidx] = (flux - minflux)/norm
+                    Xerr_test_normalised[i, :, pbidx] = fluxerr / norm
+            X_train = X_train_normalised
+            X_test = X_test_normalised
+            Xerr_train = Xerr_train_normalised
+            Xerr_test = Xerr_test_normalised
+        #
 
         if reframe is True:
             # Reframe X and y
@@ -224,16 +226,29 @@ class PrepareTrainingSetArrays(PrepareArrays):
             # timesX_train = timesX_train[:, :-1]
             # timesX_test = timesX_test[:, :-1]
         else:
-            y_train = X_train[:, 1:, :2]
-            yerr_train = Xerr_train[:, 1:, :2]
-            X_train = X_train[:, :-1]
-            Xerr_train = Xerr_train[:, :-1]
+            n_pred = npred
+            # nobjects, ntimesteps, npassbands = X_train.shape
+            # y_train = np.zeros((nobjects, ntimesteps-n_pred, npassbands*n_pred)) # np.tile(np.hstack((X_train[:, 1:, 0], X_train[:, 1:, 1])), (49,1,1)).swapaxes(0,1)  # X_train[:, 1:, :2]
+            # yerr_train = np.zeros((nobjects, ntimesteps-n_pred, npassbands*n_pred))
+            # for t in range(ntimesteps-n_pred):
+            #     y_train[:,t,:] = X_train[:,(t+1):(t+1+n_pred),:2].reshape((nobjects,npassbands*n_pred))
+            #     yerr_train[:,t,:] = Xerr_train[:,(t+1):(t+1+n_pred),:2].reshape((nobjects,npassbands*n_pred))
+            y_train = X_train[:, n_pred:, :2]
+            yerr_train = Xerr_train[:, n_pred:, :2]
+            X_train = X_train[:, :-n_pred]
+            Xerr_train = Xerr_train[:, :-n_pred]
             # timesX_train = timesX_train[:, :-1]
 
-            y_test = X_test[:, 1:, :self.npb]
-            yerr_test = Xerr_test[:, 1:, :self.npb]
-            X_test = X_test[:, :-1]
-            Xerr_test = Xerr_test[:, :-1]
+            # nobjects, ntimesteps, npassbands = X_test.shape
+            # y_test = np.zeros((nobjects, ntimesteps-n_pred, npassbands*n_pred)) # np.tile(np.hstack((X_train[:, 1:, 0], X_train[:, 1:, 1])), (49,1,1)).swapaxes(0,1)  # X_train[:, 1:, :2]
+            # yerr_test = np.zeros((nobjects, ntimesteps-n_pred, npassbands*n_pred))
+            # for t in range(ntimesteps-n_pred):
+            #     y_test[:,t,:] = X_test[:,(t+1):(t+1+n_pred),:2].reshape((nobjects,npassbands*n_pred))
+            #     yerr_test[:,t,:] = Xerr_test[:, (t + 1):(t + 1 + n_pred), :2].reshape((nobjects, npassbands * n_pred))
+            y_test = X_test[:, n_pred:, :self.npb]
+            yerr_test = Xerr_test[:, n_pred:, :self.npb]
+            X_test = X_test[:, :-n_pred]
+            Xerr_test = Xerr_test[:, :-n_pred]
             # timesX_test = timesX_test[:, :-1]
 
             # # Add errors as extra column to y

@@ -6,16 +6,19 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import json
 
+from tensorflow.python.keras.backend import set_session
+
 from transomaly.fit_gaussian_processes import save_gps
 from transomaly.get_training_data import get_data
 from transomaly import helpers
 
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 
 COLPB = {'g': 'tab:green', 'r': 'tab:red', 'gpred': 'turquoise', 'rpred': 'tab:pink'}
 MARKPB = {'g': 'o', 'r': 's', 'z': 'd'}
 ALPHAPB = {'g': 0.3, 'r': 1., 'z': 1}
+
 
 def plot_history(history, model_filename):
     # Plot loss vs epochs
@@ -41,9 +44,11 @@ def plot_history(history, model_filename):
 
 
 def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, tf_sess=None):
+    print(model_name)
     nobjects, ntimesteps, nfeatures = X_test.shape
     npassbands = len(passbands)
-
+    # global tf_sess
+    set_session(tf_sess)
     if probabilistic:
         X_test = np.asarray(X_test, np.float32)
         y_test = np.asarray(y_test, np.float32)
@@ -74,6 +79,15 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
             plt.plot(out2[0, :, 0], label='prediction not using last 20 time-steps')
             plt.legend()
             plt.savefig(os.path.join(fig_dir, model_name, "test_using_previous_timesteps_only{}".format(plot_name)))
+
+    # y_test_correct_format = np.zeros(X_test.shape)
+    # y_pred_correct_format = np.zeros(X_test.shape)
+    # y_test_correct_format[:, :, 0] = np.copy(y_test[:, -1, :49])
+    # y_test_correct_format[:, :, 1] = np.copy(y_test[:, -1, :])
+    # y_pred_correct_format[:, :, 0] = np.copy(y_pred[:, -1, :49])
+    # y_pred_correct_format[:, :, 1] = np.copy(y_pred[:, -1, :])
+    # y_test = np.copy(y_test_correct_format)
+    # y_pred = np.copy(y_pred_correct_format)
 
     # nsamples = 1 ##
 
@@ -165,18 +179,18 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                     ax1.plot(timesX_test[sidx+s][1:][-npred:][:argmax], y_pred[sidx+s][:, pbidx][:argmax], c=COLPB[f'{pb}pred'], lw=lw,
                              label=plotlabelpred, marker='*', markersize=10, alpha=alpha, linestyle=':')
 
-        #Normalised so commented out. Uncomment for unnormalised
-            ax1.errorbar(lc[pbmask]['time'].data, lc[pbmask]['flux'].data, yerr=lc[pbmask]['fluxErr'].data,
-                         fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
-
-            if plot_gp is True and nsamples == 1:
-                gp_lc[pb].compute(lc[pbmask]['time'].data, lc[pbmask]['fluxErr'].data)
-                pred_mean, pred_var = gp_lc[pb].predict(lc[pbmask]['flux'].data, timesX_test[sidx+s][:argmax], return_var=True)
-                pred_std = np.sqrt(pred_var)
-                ax1.fill_between(timesX_test[sidx+s][:argmax], pred_mean + pred_std, pred_mean - pred_std, color=COLPB[pb], alpha=0.3,
-                                 edgecolor="none")
-        ax1.text(0.05, 0.95, f"$\chi^2 = {round(save_chi2[objids_test[idx]], 3)}$", horizontalalignment='left',
-                 verticalalignment='center', transform=ax1.transAxes)
+        # #Normalised so commented out. Uncomment for unnormalised to plot actual observations and errors
+        #     ax1.errorbar(lc[pbmask]['time'].data, lc[pbmask]['flux'].data, yerr=lc[pbmask]['fluxErr'].data,
+        #                  fmt=".", capsize=0, color=COLPB[pb], label='_nolegend_')
+        #
+        #     if plot_gp is True and nsamples == 1:
+        #         gp_lc[pb].compute(lc[pbmask]['time'].data, lc[pbmask]['fluxErr'].data)
+        #         pred_mean, pred_var = gp_lc[pb].predict(lc[pbmask]['flux'].data, timesX_test[sidx+s][:argmax], return_var=True)
+        #         pred_std = np.sqrt(pred_var)
+        #         ax1.fill_between(timesX_test[sidx+s][:argmax], pred_mean + pred_std, pred_mean - pred_std, color=COLPB[pb], alpha=0.3,
+        #                          edgecolor="none")
+        # ax1.text(0.05, 0.95, f"$\chi^2 = {round(save_chi2[objids_test[idx]], 3)}$", horizontalalignment='left',
+        #          verticalalignment='center', transform=ax1.transAxes)
 
         # Plot anomaly scores
         chi2_samples = []
