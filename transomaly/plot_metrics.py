@@ -9,7 +9,7 @@ import json
 from tensorflow.python.keras.backend import set_session
 
 from transomaly.fit_gaussian_processes import save_gps
-from transomaly.get_training_data import get_data
+from astrorapid.get_training_data import get_data
 from transomaly import helpers
 
 # matplotlib.use('TkAgg')
@@ -43,7 +43,7 @@ def plot_history(history, model_filename):
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
 
 
-def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, tf_sess=None):
+def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, tf_sess=None, known_redshift=False, get_data_func=None):
     print(model_name)
     nobjects, ntimesteps, nfeatures = X_test.shape
     npassbands = len(passbands)
@@ -134,7 +134,9 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
     gp_fits = {}
     for classnum in np.unique(labels_test):
         print(f"Getting lightcurves for class:{classnum}")
-        light_curves[classnum] = get_data(classnum, data_dir, save_dir, nprocesses)
+        light_curves[classnum] = get_data(get_data_func=get_data_func, class_num=classnum, data_dir=data_dir,
+                                          save_dir=save_dir, passbands=passbands, known_redshift=known_redshift,
+                                          nprocesses=nprocesses, redo=False, calculate_t0=False)
         if plot_gp is True and nsamples == 1:
             gp_fits[classnum] = save_gps(light_curves, save_dir, classnum, passbands, plot=False,
                                      nprocesses=nprocesses, redo=False, extrapolate=extrapolate_gp)

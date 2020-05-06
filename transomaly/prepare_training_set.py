@@ -3,14 +3,15 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-from transomaly.get_training_data import get_data
+from astrorapid.get_training_data import get_data
 from transomaly.fit_gaussian_processes import save_gps
 from transomaly.prepare_arrays import PrepareArrays
 
 
 class PrepareTrainingSetArrays(PrepareArrays):
     def __init__(self, passbands=('g', 'r'), contextual_info=('redshift',), data_dir='data/ZTF_20190512/',
-                 save_dir='data/saved_light_curves/', training_set_dir='data/training_set_files/', redo=False):
+                 save_dir='data/saved_light_curves/', training_set_dir='data/training_set_files/', redo=False,
+                 get_data_func=None):
         PrepareArrays.__init__(self, passbands, contextual_info)
         self.passbands = passbands
         self.contextual_info = contextual_info
@@ -24,13 +25,22 @@ class PrepareTrainingSetArrays(PrepareArrays):
         self.save_dir = save_dir
         self.training_set_dir = training_set_dir
         self.redo = redo
+        self.get_data_func = get_data_func
+
+        if 'redshift' in contextual_info:
+            self.known_redshift = True
+        else:
+            self.known_redshift = False
+
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         if not os.path.exists(self.training_set_dir):
             os.makedirs(self.training_set_dir)
 
     def get_light_curves(self, class_num, nprocesses=1):
-        light_curves = get_data(class_num, self.data_dir, self.save_dir, self.passbands, nprocesses, self.redo)
+        light_curves = get_data(get_data_func=self.get_data_func, class_num=class_num, data_dir=self.data_dir,
+                                save_dir=self.save_dir, passbands=self.passbands, known_redshift=self.known_redshift,
+                                nprocesses=nprocesses, redo=self.redo, calculate_t0=False)
 
         return light_curves
 

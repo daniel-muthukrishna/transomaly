@@ -15,6 +15,8 @@ from tensorflow.python.keras.backend import set_session
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 
+import astrorapid
+
 from transomaly.prepare_training_set import PrepareTrainingSetArrays
 from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_squared_error_over_error
 from transomaly.plot_metrics import plot_metrics, plot_history
@@ -150,8 +152,10 @@ def main():
     save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
     training_set_dir = os.path.join(SCRIPT_DIR, '..', 'data/training_set_files')
     fig_dir = os.path.join(SCRIPT_DIR, '..', 'plots')
+    get_data_func = astrorapid.get_training_data.get_data_from_snana_fits
     passbands = ('g', 'r')
     contextual_info = ()
+    known_redshift = True if 'redshift' in contextual_info else False
     nprocesses = None
     class_nums = (1,)
     otherchange = ''  # 'singleobject_1_50075859_gp_samples_extrapolated_gp'  # '8020split' #  #'5050testvalidation' #
@@ -172,7 +176,7 @@ def main():
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
-    preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo)
+    preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo, get_data_func)
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
         preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise)
@@ -184,14 +188,14 @@ def main():
     #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess)
     #
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func)
 
     # Test on other classes  #51,60,62,70 AndOtherTypes
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
         preparearrays.make_training_set(class_nums=(1,51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise)
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func)
 
 
     # class_nums_test_on = (1, 2, 12, 14, 3, 13, 41, 43, 51, 60, 61, 62, 63, 64, 70)  # , 80, 81, 83)

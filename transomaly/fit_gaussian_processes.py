@@ -9,7 +9,8 @@ from scipy.optimize import minimize
 import matplotlib
 matplotlib.use('Agg')
 
-from transomaly.get_training_data import get_data
+import astrorapid
+from astrorapid.get_training_data import get_data
 
 def combined_neg_log_like(params, fluxes, gp_lcs, passbands):
     loglike = 0
@@ -156,7 +157,9 @@ def main():
     data_dir = os.path.join(SCRIPT_DIR, '', 'data/ZTF_20190512')
     save_dir = os.path.join(SCRIPT_DIR, '..', 'data/saved_light_curves')
 
-    light_curves = get_data(class_num, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, redo=False)
+    light_curves = get_data(get_data_func=astrorapid.get_training_data.get_data_from_snana_fits,
+                            class_num=class_num, data_dir=data_dir, save_dir=save_dir,
+                            nprocesses=nprocesses, redo=False, calculate_t0=False)
     saved_gp_fits = save_gps(light_curves, save_dir=save_dir, class_num=class_num, passbands=('g', 'r'), plot=True,
                              nprocesses=nprocesses, redo=True, extrapolate=extrapolate)
 
