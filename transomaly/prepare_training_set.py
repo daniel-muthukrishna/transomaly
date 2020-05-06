@@ -54,7 +54,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
         nobjects = len(light_curves)
         nrows = nobjects * nsamples
 
-        labels = np.zeros(shape=nrows, dtype=np.uint16)
+        labels = np.empty(shape=nobjects, dtype=object)
         # X = np.memmap(os.path.join(self.training_set_dir, 'X_lc_data.dat'), dtype=np.float32, mode='w+',
         #               shape=(nrows, self.nfeatures, self.nobs))
         # Xerr = np.memmap(os.path.join(self.training_set_dir, 'Xerr_lc_data.dat'), dtype=np.float32, mode='w+',
@@ -81,7 +81,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
             for ns in range(nsamples):
                 timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
-                labels[idx + ns] = int(objid.split('_')[0])
+                labels[idx + ns] = lc.meta['class_num']
             X, Xerr = self.update_X(X, Xerr, idx, gp_lc, lc, tinterp, len_t, objid, self.contextual_info, lc.meta, nsamples)
 
         # Count nobjects per class
