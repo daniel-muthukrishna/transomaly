@@ -2,13 +2,13 @@ import keras.backend as K
 
 
 def negloglike():
-    loss = lambda y, rv_y: -rv_y.log_prob(y)
+    # loss = lambda y, rv_y: -rv_y.log_prob(y)
 
-    # def loss(y_true, y_pred):
-    #     # y_err = y_true[:, :, 2:4]
-    #     # y_t = y_true[:, :, 0:2]
-    #     # y_p = y_pred[:, :, 0:2]
-    #     return -y_pred.log_prob(y_true)
+    def loss(y_true, y_pred):
+        # y_err = y_true[:, :, 2:4]
+        # y_t = y_true[:, :, 0:2]
+        # y_p = y_pred[:, :, 0:2]
+        return -y_pred.log_prob(y_true)
 
     return loss
 

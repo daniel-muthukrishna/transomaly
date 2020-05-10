@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import json
 
-from tensorflow.python.keras.backend import set_session
-
 from transomaly.fit_gaussian_processes import save_gps
 from astrorapid.get_training_data import get_data
 from transomaly import helpers
@@ -43,19 +41,17 @@ def plot_history(history, model_filename):
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
 
 
-def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, tf_sess=None, known_redshift=False, get_data_func=None, normalise=False):
+def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, known_redshift=False, get_data_func=None, normalise=False):
     print(model_name)
     nobjects, ntimesteps, nfeatures = X_test.shape
     npassbands = len(passbands)
-    # global tf_sess
-    set_session(tf_sess)
+
     if probabilistic:
         X_test = np.asarray(X_test, np.float32)
         y_test = np.asarray(y_test, np.float32)
-        with tf_sess.as_default():
-            yhat = model(X_test)
-            y_pred = yhat.mean().eval()
-            y_pred_std = yhat.stddev().eval()
+        yhat = model(X_test)
+        y_pred = yhat.mean()
+        y_pred_std = yhat.stddev()
     else:
         y_pred = model.predict(X_test)
 
