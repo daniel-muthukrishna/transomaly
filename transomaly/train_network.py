@@ -14,6 +14,8 @@ from tensorflow.python.keras.layers import Dense, Input, LSTM, GRU, Dropout, Bat
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 
+from tcn import TCN, tcn_full_summary
+
 import astrorapid
 
 from transomaly.prepare_training_set import PrepareTrainingSetArrays
@@ -56,7 +58,8 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
 
             model.add(Masking(mask_value=0., input_shape=(X_train.shape[1], X_train.shape[2])))
 
-            model.add(LSTM(100, return_sequences=True))
+            model.add(TCN(100, return_sequences=True))
+            # model.add(LSTM(100, return_sequences=True))
             # # model.add(Dropout(0.2, seed=42))
             # # model.add(BatchNormalization())
 
@@ -72,7 +75,8 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
                 # model.add(Dropout(0.2, seed=42))
                 model.add(Dense(npb))
             else:
-                model.add(LSTM(100, return_sequences=True))
+                # model.add(TCN(100, return_sequences=True))
+                # model.add(LSTM(100, return_sequences=True))
                 # # model.add(Dropout(0.2, seed=42))
                 # # model.add(BatchNormalization())
                 # # model.add(Dropout(0.2, seed=42))
@@ -124,6 +128,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
                     model.compile(loss='mse', optimizer='adam')
                 else:
                     model.compile(loss=mean_squared_error(), optimizer='adam')
+            tcn_full_summary(model, expand_residual_blocks=True)
             history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=200, verbose=2)
 
             # import pdb; pdb.set_trace()
@@ -159,7 +164,7 @@ def main():
     train_from_last_stop = 0
     normalise = True
 
-    nn_architecture_change = f"{'probabilistic_' if probabilistic else ''}predictpoint{npred}timestepsinfuture_normalised{normalise}_mse_nodropout_100lstmneurons"
+    nn_architecture_change = f"1TCN_{'probabilistic_' if probabilistic else ''}predictpoint{npred}timestepsinfuture_normalised{normalise}_nodropout_100units"
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):
