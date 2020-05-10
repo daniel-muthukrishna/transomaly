@@ -18,7 +18,7 @@ tfd = tfp.distributions
 import astrorapid
 
 from transomaly.prepare_training_set import PrepareTrainingSetArrays
-from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_squared_error_over_error
+from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_squared_error_over_error, negloglike
 from transomaly.plot_metrics import plot_metrics, plot_history
 
 
@@ -35,8 +35,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     npb = len(passbands)
 
     if probabilistic:
-        negloglik = lambda y, rv_y: -rv_y.log_prob(y)
-        lossfn = negloglik
+        lossfn = negloglike()
     elif 'chi2' in model_change:
         lossfn = chisquare_loss()
     elif 'mse_oe' in model_change:
@@ -124,8 +123,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
                 if probabilistic:
                     model.add(tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t[..., ::2],
                                                                                  scale=tf.math.softplus(t[..., 1::2]))),)
-                    negloglik = lambda y, rv_y: -rv_y.log_prob(y)
-                    model.compile(loss=negloglik, optimizer='adam')
+                    model.compile(loss=negloglike(), optimizer='adam')
                 else:
                     if 'chi2' in model_change:
                         model.compile(loss=chisquare_loss(), optimizer='adam')
@@ -185,17 +183,17 @@ def main():
                         retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop)
 
     # plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
-    #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess)
+    #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)
     #
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)
 
     # Test on other classes  #51,60,62,70 AndOtherTypes
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
         preparearrays.make_training_set(class_nums=(1,51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise)
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, tf_sess=tf_sess, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)
 
 
     # class_nums_test_on = (1, 2, 12, 14, 3, 13, 41, 43, 51, 60, 61, 62, 63, 64, 70)  # , 80, 81, 83)

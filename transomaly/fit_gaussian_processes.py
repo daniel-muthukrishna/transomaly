@@ -7,7 +7,7 @@ import celerite
 from celerite import terms
 from scipy.optimize import minimize
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 
 import astrorapid
 from astrorapid.get_training_data import get_data
