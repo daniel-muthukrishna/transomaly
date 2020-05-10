@@ -24,7 +24,7 @@ from transomaly.plot_metrics import plot_metrics, plot_history
 def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir='.', epochs=20, retrain=False,
                 passbands=('g', 'r'), model_change='', reframe=False, probabilistic=False, train_from_last_stop=0):
 
-    model_name = f"{'probabilistic_' if probabilistic else ''}keras_model_epochs{epochs+train_from_last_stop}_{model_change}"
+    model_name = f"keras_model_epochs{epochs+train_from_last_stop}_{model_change}"
     model_filename = os.path.join(fig_dir, model_name, f"{model_name}.hdf5")
     if not os.path.exists(os.path.join(fig_dir, model_name)):
         os.makedirs(os.path.join(fig_dir, model_name))
