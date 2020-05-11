@@ -75,7 +75,6 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
                 # model.add(Dropout(0.2, seed=42))
                 model.add(Dense(npb))
             else:
-                # model.add(TCN(100, return_sequences=True))
                 # model.add(LSTM(100, return_sequences=True))
                 # # model.add(Dropout(0.2, seed=42))
                 # # model.add(BatchNormalization())
@@ -129,7 +128,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
                 else:
                     model.compile(loss=mean_squared_error(), optimizer='adam')
             tcn_full_summary(model, expand_residual_blocks=True)
-            history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=200, verbose=2)
+            history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=50, verbose=2)
 
             # import pdb; pdb.set_trace()
             print(model.summary())
@@ -163,6 +162,7 @@ def main():
     probabilistic = True
     train_from_last_stop = 0
     normalise = True
+    use_uncertainties = False
 
     nn_architecture_change = f"1TCN_{'probabilistic_' if probabilistic else ''}predictpoint{npred}timestepsinfuture_normalised{normalise}_nodropout_100units"
 
@@ -173,7 +173,7 @@ def main():
     preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo, get_data_func)
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise)
+        preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise, use_uncertainties=use_uncertainties)
 
     model, model_name = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs,
                         retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop)

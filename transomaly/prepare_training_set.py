@@ -92,7 +92,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
         return X, Xerr, timesX, labels, objids
 
-    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49, normalise=False):
+    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49, normalise=False, use_uncertainties=False):
         savepath = os.path.join(self.training_set_dir, "X_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums))
 
         if self.redo is True or not os.path.isfile(savepath):
@@ -261,13 +261,14 @@ class PrepareTrainingSetArrays(PrepareArrays):
             Xerr_test = Xerr_test[:, :-n_pred]
             # timesX_test = timesX_test[:, :-1]
 
-            # # Add errors as extra column to y
-            # ye_train = np.copy(yerr_train)
-            # ye_test = np.copy(yerr_test)
-            # ye_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
-            # ye_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
-            # y_train = np.dstack((y_train, ye_train))
-            # y_test = np.dstack((y_test, ye_test))
+            if use_uncertainties:
+                # Add errors as extra column to y
+                ye_train = np.copy(yerr_train)
+                ye_test = np.copy(yerr_test)
+                # ye_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
+                # ye_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
+                y_train = np.dstack((y_train, ye_train))
+                y_test = np.dstack((y_test, ye_test))
 
         return X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
                timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test
