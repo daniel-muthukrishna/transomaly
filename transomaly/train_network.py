@@ -1,20 +1,15 @@
 import os
 import numpy as np
-# from keras.models import Sequential
-# from keras.models import load_model
-# from keras.layers import Dense, Input
-# from keras.layers import LSTM, GRU
-# from keras.layers import Dropout, BatchNormalization, Activation, TimeDistributed, Masking
 
 import tensorflow as tf
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.models import load_model
-from tensorflow.python.keras.layers import Dense, Input, LSTM, GRU, Dropout, BatchNormalization, Activation, TimeDistributed, Masking
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import Dense, LSTM, TimeDistributed, Masking
 
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 
-from tcn import TCN, tcn_full_summary
+from tcn_variational import TCN, tcn_full_summary
 
 import astrorapid
 
@@ -85,33 +80,6 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
                 # # model.add(BatchNormalization())
                 # # model.add(Dropout(0.2, seed=42))
                 if probabilistic:
-
-                    # Specify the prior over `keras.layers.Dense` `kernel` and `bias`.
-                    def prior_trainable(kernel_size, bias_size=0, dtype=None):
-                        print(dtype)
-                        n = kernel_size + bias_size
-                        print(kernel_size, bias_size)
-                        return Sequential([
-                            tfp.layers.VariableLayer(n, dtype=dtype),
-                            tfp.layers.DistributionLambda(lambda t: tfd.Independent(
-                                tfd.Normal(loc=t, scale=1),
-                                reinterpreted_batch_ndims=1)),
-                        ])
-
-                    # Specify the surrogate posterior over `keras.layers.Dense` `kernel` and `bias`.
-                    def posterior_mean_field(kernel_size, bias_size=0, dtype=None):
-                        print(dtype)
-                        n = kernel_size + bias_size
-                        print(kernel_size, bias_size)
-                        c = np.log(np.expm1(1.))
-                        return Sequential([
-                            tfp.layers.VariableLayer(2 * n, dtype=dtype),
-                            tfp.layers.DistributionLambda(lambda t: tfd.Independent(
-                                tfd.Normal(loc=t[..., :n],
-                                           scale=1e-5 + tf.nn.softplus(c + t[..., n:])),
-                                reinterpreted_batch_ndims=1)),
-                        ])
-
                     # every second column is the mean; every other column is the stddev
                     model.add(TimeDistributed(Dense(npb*2)))
                     # model.add(TimeDistributed(tfp.layers.DenseFlipout(npb * 2)))
@@ -192,7 +160,7 @@ def main():
     # Test on other classes  #51,60,62,70 AndOtherTypes
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
-        preparearrays.make_training_set(class_nums=(1,51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise)
+        preparearrays.make_training_set(class_nums=(1,51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise, use_uncertainties=use_uncertainties)
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
                  fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)
 
