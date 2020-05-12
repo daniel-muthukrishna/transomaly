@@ -1,3 +1,4 @@
+import numpy as np
 
 
 def get_sntypes():
@@ -31,3 +32,13 @@ def get_sntypes():
                    93: 'uLens - Point',
                    99: 'Rare'}
     return sntypes_map
+
+
+def delete_indexes_from_arrays(delete_indexes, axis=None, *args):
+    newarrs = []
+    for arr in args:
+        newarr = np.delete(arr, delete_indexes, axis=axis)
+        newarrs.append(newarr)
+        assert len(arr.shape) == len(newarr.shape)
+
+    return newarrs

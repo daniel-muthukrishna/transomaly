@@ -19,12 +19,13 @@ from tcn import TCN, tcn_full_summary
 import astrorapid
 
 from transomaly.prepare_training_set import PrepareTrainingSetArrays
-from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_squared_error_over_error, negloglike
+from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_squared_error_over_error, negloglike, negloglike_with_error
 from transomaly.plot_metrics import plot_metrics, plot_history
 
 
 def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir='.', epochs=20, retrain=False,
-                passbands=('g', 'r'), model_change='', reframe=False, probabilistic=False, train_from_last_stop=0):
+                passbands=('g', 'r'), model_change='', reframe=False, probabilistic=False, train_from_last_stop=0,
+                use_uncertainties=False):
 
     model_name = f"keras_model_epochs{epochs+train_from_last_stop}_{model_change}"
     model_filename = os.path.join(fig_dir, model_name, f"{model_name}.hdf5")
@@ -34,7 +35,10 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     npb = len(passbands)
 
     if probabilistic:
-        lossfn = negloglike()
+        if use_uncertainties:
+            lossfn = negloglike_with_error()
+        else:
+            lossfn = negloglike()
     elif 'chi2' in model_change:
         lossfn = chisquare_loss()
     elif 'mse_oe' in model_change:
@@ -58,7 +62,8 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
 
             model.add(Masking(mask_value=0., input_shape=(X_train.shape[1], X_train.shape[2])))
 
-            model.add(TCN(100, return_sequences=True))
+            model.add(TCN(100, return_sequences=True, kernel_size=2, nb_stacks=1, dilations=[1, 2, 4, 8],
+                          padding='causal', use_skip_connections=True, dropout_rate=0.0, activation='sigmoid'))
             # model.add(LSTM(100, return_sequences=True))
             # # model.add(Dropout(0.2, seed=42))
             # # model.add(BatchNormalization())
@@ -117,7 +122,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
             if probabilistic:
                 model.add(tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t[..., ::2],
                                                                              scale=tf.math.softplus(t[..., 1::2]))),)
-                model.compile(loss=negloglike(), optimizer='adam')
+                model.compile(loss=lossfn, optimizer='adam')
             else:
                 if 'chi2' in model_change:
                     model.compile(loss=chisquare_loss(), optimizer='adam')
@@ -162,9 +167,9 @@ def main():
     probabilistic = True
     train_from_last_stop = 0
     normalise = True
-    use_uncertainties = False
+    use_uncertainties = True
 
-    nn_architecture_change = f"1TCN_{'probabilistic_' if probabilistic else ''}predictpoint{npred}timestepsinfuture_normalised{normalise}_nodropout_100units"
+    nn_architecture_change = f"1TCN_{'probabilistic_' if probabilistic else ''}uncertainties{use_uncertainties}_predictfuture{npred}point_normalised{normalise}_nodropout_100units"
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):
@@ -176,7 +181,7 @@ def main():
         preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise, use_uncertainties=use_uncertainties)
 
     model, model_name = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs,
-                        retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop)
+                        retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop, use_uncertainties=use_uncertainties)
 
     # plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
     #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)

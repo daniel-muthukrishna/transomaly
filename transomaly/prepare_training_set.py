@@ -6,6 +6,7 @@ from sklearn.utils import shuffle
 from astrorapid.get_training_data import get_data
 from transomaly.fit_gaussian_processes import save_gps
 from transomaly.prepare_arrays import PrepareArrays
+from transomaly.helpers import delete_indexes_from_arrays
 
 
 class PrepareTrainingSetArrays(PrepareArrays):
@@ -261,12 +262,18 @@ class PrepareTrainingSetArrays(PrepareArrays):
             Xerr_test = Xerr_test[:, :-n_pred]
             # timesX_test = timesX_test[:, :-1]
 
+            # Delete indexes where any errors are zero
+            delete_indexes = np.unique(np.where(Xerr_train == 0)[0])
+            print("Deleting indexes where any uncertainties are zero for objids", objids_train[delete_indexes])
+            X_train, y_train, Xerr_train, yerr_train, timesX_train, labels_train, objids_train = delete_indexes_from_arrays(delete_indexes, 0, X_train, y_train, Xerr_train, yerr_train, timesX_train, labels_train, objids_train)
+            delete_indexes = np.unique(np.where(Xerr_test == 0)[0])
+            print("Deleting indexes where any uncertainties are zero for objids", objids_train[delete_indexes])
+            X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test = delete_indexes_from_arrays(delete_indexes, 0, X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test)
+
             if use_uncertainties:
                 # Add errors as extra column to y
                 ye_train = np.copy(yerr_train)
                 ye_test = np.copy(yerr_test)
-                # ye_train[yerr_train == 0] = np.ones(yerr_train[yerr_train == 0].shape)
-                # ye_test[yerr_test == 0] = np.ones(yerr_test[yerr_test == 0].shape)
                 y_train = np.dstack((y_train, ye_train))
                 y_test = np.dstack((y_test, ye_test))
 
@@ -290,14 +297,6 @@ def main():
     prepare_training_set = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir)
     prepare_training_set.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp)
 
-
-def delete_indexes(deleteindexes, *args):
-    newarrs = []
-    for arr in args:
-        newarr = np.delete(arr, deleteindexes)
-        newarrs.append(newarr)
-
-    return newarrs
 
 if __name__ == '__main__':
     main()
