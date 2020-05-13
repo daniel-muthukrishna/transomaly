@@ -9,7 +9,7 @@ from tensorflow.keras.layers import Dense, LSTM, TimeDistributed, Masking
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 
-from tcn_variational import TCN, tcn_full_summary
+from bayesian_tcn import TCN, tcn_full_summary
 
 import astrorapid
 
