@@ -1,10 +1,11 @@
 import os
 import numpy as np
+import h5py
 
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import Dense, LSTM, TimeDistributed, Masking
+from tensorflow.keras.layers import Dense, LSTM, TimeDistributed, Masking, Conv1D
 
 import tensorflow_probability as tfp
 tfd = tfp.distributions
@@ -18,19 +19,85 @@ from transomaly.loss_functions import mean_squared_error, chisquare_loss, mean_s
 from transomaly.plot_metrics import plot_metrics, plot_history
 
 
+def load_tf_model(model_filename, lossfn, bayesian, X_train=None, passbands=('g', 'r'), reframe=False, probabilistic=False, nunits=100):
+    if bayesian:
+        # Issue: Tensorflow variational models not being saved properly noted here: https://github.com/tensorflow/probability/issues/325
+        model = build_model(X_train, passbands, reframe, probabilistic, nunits, bayesian)
+        file = h5py.File(model_filename, 'r')
+        weight = []
+        for i in range(len(file.keys())):
+            weight.append(file['weight' + str(i)][:])
+        model.set_weights(weight)
+    else:
+        model = load_model(model_filename, custom_objects={'loss': lossfn, 'TCN': TCN})
+
+    return model
+
+
+def save_tf_model(model, model_filename, bayesian):
+    if bayesian:
+        file = h5py.File(model_filename, 'w')
+        weight = model.get_weights()
+        for i in range(len(weight)):
+            file.create_dataset('weight' + str(i), data=weight[i])
+        file.close()
+    else:
+        model.save(model_filename)
+
+
+def build_model(X_train, passbands=('g', 'r'), reframe=False, probabilistic=False, nunits=100, bayesian=False):
+    npb = len(passbands)
+    model = Sequential()
+
+    model.add(Masking(mask_value=0., input_shape=(X_train.shape[1], X_train.shape[2])))
+
+    model.add(TCN(nunits, return_sequences=True, kernel_size=2, nb_stacks=1, dilations=[1, 2, 4, 8],
+                  padding='same', use_skip_connections=True, dropout_rate=0.0, activation='sigmoid',
+                  bayesian=bayesian))
+    # model.add(LSTM(nunits, return_sequences=True))
+    # # model.add(Dropout(0.2, seed=42))
+    # # model.add(BatchNormalization())
+
+    # model.add(LSTM(nunits, return_sequences=True))
+    # # model.add(Dropout(0.2, seed=42))
+    # # model.add(BatchNormalization())
+    # # model.add(Dropout(0.2, seed=42))
+
+    if reframe is True:
+        model.add(LSTM(nunits))
+        # model.add(Dropout(0.2, seed=42))
+        # model.add(BatchNormalization())
+        # model.add(Dropout(0.2, seed=42))
+        model.add(Dense(npb))
+    else:
+        # model.add(LSTM(nunits, return_sequences=True))
+        # # model.add(Dropout(0.2, seed=42))
+        # # model.add(BatchNormalization())
+        # # model.add(Dropout(0.2, seed=42))
+        if probabilistic:
+            # every second column is the mean; every other column is the stddev
+            if bayesian:
+                model.add(TimeDistributed(tfp.layers.DenseFlipout(npb * 2)))
+            else:
+                model.add(TimeDistributed(Dense(npb * 2)))
+        else:
+            model.add(TimeDistributed(Dense(npb * 1)))
+
+    if probabilistic:
+        model.add(tfp.layers.DistributionLambda(
+            lambda t: tfd.Normal(loc=t[..., ::2], scale=tf.math.softplus(t[..., 1::2]))), )
+
+    return model
+
+
 def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir='.', epochs=20, retrain=False,
                 passbands=('g', 'r'), model_change='', reframe=False, probabilistic=False, train_from_last_stop=0,
-                use_uncertainties=False, bayesian=False):
+                batch_size=50, nunits=100, use_uncertainties=False, bayesian=False):
 
     model_name = f"keras_model_epochs{epochs+train_from_last_stop}_{model_change}"
     model_filename = os.path.join(fig_dir, model_name, f"{model_name}.hdf5")
     if not os.path.exists(os.path.join(fig_dir, model_name)):
         os.makedirs(os.path.join(fig_dir, model_name))
-
-    npb = len(passbands)
-
-    if probabilistic and bayesian:
-        tf.compat.v1.disable_eager_execution()  # Needed because of known Tensorflow bug with Convolutional VI
 
     if probabilistic:
         if use_uncertainties:
@@ -45,72 +112,24 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
         lossfn = mean_squared_error()
 
     if not retrain and os.path.isfile(model_filename):
-        model = load_model(model_filename, custom_objects={'loss': lossfn})
+        model = load_tf_model(model_filename, lossfn, bayesian, X_train, passbands, reframe, probabilistic, nunits)
     else:
+        if probabilistic and bayesian:
+            tf.compat.v1.disable_eager_execution()  # Needed because of known Tensorflow bug with Convolutional VI
         if train_from_last_stop:
             old_model_name = f"keras_model_epochs{train_from_last_stop}_{model_change}"
             old_model_filename = os.path.join(fig_dir, old_model_name, f"{old_model_name}.hdf5")
-            model = load_model(old_model_filename, custom_objects={'loss': mean_squared_error()})
+            model = load_tf_model(old_model_filename, lossfn, bayesian, X_train, passbands, reframe, probabilistic, nunits)
             history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs,
-                                batch_size=250, verbose=2, inital_epoch=train_from_last_stop)
-            print(model.summary())
-            model.save(model_filename)
+                                batch_size=batch_size, verbose=2, inital_epoch=train_from_last_stop)
         else:
-            model = Sequential()
-
-            model.add(Masking(mask_value=0., input_shape=(X_train.shape[1], X_train.shape[2])))
-
-            model.add(TCN(100, return_sequences=True, kernel_size=2, nb_stacks=1, dilations=[1, 2, 4, 8],
-                          padding='causal', use_skip_connections=True, dropout_rate=0.0, activation='sigmoid',
-                          bayesian=bayesian))
-            # model.add(LSTM(100, return_sequences=True))
-            # # model.add(Dropout(0.2, seed=42))
-            # # model.add(BatchNormalization())
-
-            # model.add(LSTM(100, return_sequences=True))
-            # # model.add(Dropout(0.2, seed=42))
-            # # model.add(BatchNormalization())
-            # # model.add(Dropout(0.2, seed=42))
-
-            if reframe is True:
-                model.add(LSTM(100))
-                # model.add(Dropout(0.2, seed=42))
-                # model.add(BatchNormalization())
-                # model.add(Dropout(0.2, seed=42))
-                model.add(Dense(npb))
-            else:
-                # model.add(LSTM(100, return_sequences=True))
-                # # model.add(Dropout(0.2, seed=42))
-                # # model.add(BatchNormalization())
-                # # model.add(Dropout(0.2, seed=42))
-                if probabilistic:
-                    if bayesian:
-                        # every second column is the mean; every other column is the stddev
-                        model.add(TimeDistributed(tfp.layers.DenseFlipout(npb * 2)))
-                    else:
-                        model.add(TimeDistributed(Dense(npb*2)))
-                else:
-                    model.add(TimeDistributed(Dense(npb*1)))
-
-            if probabilistic:
-                model.add(tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t[..., ::2],
-                                                                             scale=tf.math.softplus(t[..., 1::2]))),)
-                model.compile(loss=lossfn, optimizer='adam')
-            else:
-                if 'chi2' in model_change:
-                    model.compile(loss=chisquare_loss(), optimizer='adam')
-                elif 'mse_oe' in model_change:
-                    model.compile(loss=mean_squared_error_over_error(), optimizer='adam')
-                elif reframe is True:
-                    model.compile(loss='mse', optimizer='adam')
-                else:
-                    model.compile(loss=mean_squared_error(), optimizer='adam')
+            model = build_model(X_train, passbands, reframe, probabilistic, nunits, bayesian)
+            model.compile(loss=lossfn, optimizer='adam')
             tcn_full_summary(model, expand_residual_blocks=True)
-            history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=50, verbose=2)
+            history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=batch_size, verbose=2)
 
-            # import pdb; pdb.set_trace()
-            print(model.summary())
-            model.save(model_filename)
+        print(model.summary())
+        save_tf_model(model, model_filename, bayesian)
 
         plot_history(history, model_filename)
 
@@ -139,11 +158,13 @@ def main():
     npred = 1
     probabilistic = True
     train_from_last_stop = 0
+    batch_size = 50
+    nunits = 50
     normalise = True
     use_uncertainties = True
     bayesian = True
 
-    nn_architecture_change = f"1TCN_{'probabilistic_' if probabilistic else ''}bayesian{bayesian}_uncertainties{use_uncertainties}_predictfuture{npred}point_normalised{normalise}_nodropout_100units"
+    nn_architecture_change = f"1TCN_{'probabilistic_' if probabilistic else ''}bayesian{bayesian}_uncertainties{use_uncertainties}_predictfuture{npred}point_normalised{normalise}_nodropout_{nunits}units_batchsize{batch_size}"
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):
@@ -155,20 +176,20 @@ def main():
         preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise, use_uncertainties=use_uncertainties)
 
     model, model_name = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs,
-                        retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop, use_uncertainties=use_uncertainties, bayesian=bayesian)
+                        retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop, batch_size=batch_size, nunits=nunits, use_uncertainties=use_uncertainties, bayesian=bayesian)
 
     # plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
-    #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)
+    #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise, bayesian=bayesian)
     #
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise, bayesian=bayesian)
 
     # Test on other classes  #51,60,62,70 AndOtherTypes
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
         preparearrays.make_training_set(class_nums=(1,51,), nsamples=1, otherchange='getKnAndOtherTypes', nprocesses=nprocesses, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, npred=npred, normalise=normalise, use_uncertainties=use_uncertainties)
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
-                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise)
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='anomaly', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise, bayesian=bayesian)
 
 
     # class_nums_test_on = (1, 2, 12, 14, 3, 13, 41, 43, 51, 60, 61, 62, 63, 64, 70)  # , 80, 81, 83)

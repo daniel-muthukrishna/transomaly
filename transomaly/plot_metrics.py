@@ -41,7 +41,7 @@ def plot_history(history, model_filename):
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
 
 
-def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, known_redshift=False, get_data_func=None, normalise=False):
+def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, known_redshift=False, get_data_func=None, normalise=False, bayesian=False):
     print(model_name)
     nobjects, ntimesteps, nfeatures = X_test.shape
     npassbands = len(passbands)
@@ -89,43 +89,42 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
 
     # nsamples = 1 ##
 
-    # Get reduced chi_squared
-    chi2_hist = []
-    chi2_reduced_allobjects = 0
-    reduce_count = 0
-    save_object_chi2 = []
-    save_chi2 = {}
-    for idx in range(nobjects):
-        for pbidx, pb in enumerate(passbands):
-            m = yerr_test[idx, :, pbidx] != 0  # ignore zeros (where no data exists)
-            yt = y_test[idx, :, pbidx][m]
-            yp = y_pred[idx, :, pbidx][m]
-            ye = yerr_test[idx, :, pbidx][m]
-            if len(yt) == 0:
-                reduce_count += 1
-                print(f"No values for {objids_test[idx]} {pb}-band")
-                continue
-            chi2 = sum(((yt - yp) / ye) ** 2)
-            chi2_reduced = chi2 / len(yt)
-            chi2_reduced_allobjects += chi2_reduced
-        chi2_hist.append(chi2_reduced/npassbands)
-        save_object_chi2.append((idx, objids_test[idx], chi2_reduced/npassbands))
-        save_chi2[objids_test[idx]] = chi2_reduced/npassbands
-    chi2_reduced_allobjects = chi2_reduced_allobjects / ((nobjects * npassbands) - reduce_count)
-    print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
-    print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
-    with open(os.path.join(fig_dir, model_name, f'model_info{plot_name}.txt'), 'w') as file:
-        file.write(f"{model_name}\n")
-        file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}\n")
-        file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}\n")
-    # plt.figure()
-    # plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 3*np.std(chi2_hist))))
-    # plt.legend()
-    # plt.xlabel("chi-squared")
-    # plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution{}.pdf'.format(plot_name)))
-
-    save_object_chi2 = sorted(save_object_chi2, key=lambda x: x[2])
-    print(save_object_chi2[:100])
+    # # Get reduced chi_squared
+    # chi2_hist = []
+    # chi2_reduced_allobjects = 0
+    # reduce_count = 0
+    # save_object_chi2 = []
+    # save_chi2 = {}
+    # for idx in range(nobjects):
+    #     for pbidx, pb in enumerate(passbands):
+    #         m = yerr_test[idx, :, pbidx] != 0  # ignore zeros (where no data exists)
+    #         yt = y_test[idx, :, pbidx][m]
+    #         yp = y_pred[idx, :, pbidx][m]
+    #         ye = yerr_test[idx, :, pbidx][m]
+    #         if len(yt) == 0:
+    #             reduce_count += 1
+    #             print(f"No values for {objids_test[idx]} {pb}-band")
+    #             continue
+    #         chi2 = sum(((yt - yp) / ye) ** 2)
+    #         chi2_reduced = chi2 / len(yt)
+    #         chi2_reduced_allobjects += chi2_reduced
+    #     chi2_hist.append(chi2_reduced/npassbands)
+    #     save_object_chi2.append((idx, objids_test[idx], chi2_reduced/npassbands))
+    #     save_chi2[objids_test[idx]] = chi2_reduced/npassbands
+    # chi2_reduced_allobjects = chi2_reduced_allobjects / ((nobjects * npassbands) - reduce_count)
+    # print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
+    # print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
+    # with open(os.path.join(fig_dir, model_name, f'model_info{plot_name}.txt'), 'w') as file:
+    #     file.write(f"{model_name}\n")
+    #     file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}\n")
+    #     file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}\n")
+    # # plt.figure()
+    # # plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 3*np.std(chi2_hist))))
+    # # plt.legend()
+    # # plt.xlabel("chi-squared")
+    # # plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution{}.pdf'.format(plot_name)))
+    # save_object_chi2 = sorted(save_object_chi2, key=lambda x: x[2])
+    # print(save_object_chi2[:100])
 
     # Get raw light curve data
     light_curves = {}
