@@ -5,16 +5,16 @@ which is an implementation of the Temporal Convolutional Network described in
 Bai, Kolter and Kiltun (2018) https://arxiv.org/pdf/1803.01271.pdf
 
 Changes made:
-12-May-2020: Added lines
-    from tensorflow.keras.layers import Layer, BatchNormalization, LayerNormalization # Conv1D, Dense
-    import tensorflow_probability as tfp
-    Conv1D = tfp.layers.Convolution1DFlipout
-    Dense = tfp.layers.DenseFlipout
 
-    and commented out references to kernel_initializer in Conv1D since Convolution1DFlipout does not use this
-
-13-May-2020: Problem with Convolutional1DFlipout, Tensorflow 2.2 and Tensorflow_probability 0.9.
+13-May-2020:
+    Problem with Convolutional1DFlipout, Tensorflow 2.2 and Tensorflow_probability 0.9.
     known issue here: https://github.com/tensorflow/probability/issues/620
+
+13-May-2020:
+    Added option for bayesian network by replacing tf.keras.layers.Conv1D with tfp.layers.Convolution1DFlipout
+    and commented out references to kernel_initializer in Convolution1DFlipout.
+    Need to fix issue with Convolutional1DFlipout not having padding='causal' as an option
+
 """
 
 import inspect
@@ -23,11 +23,10 @@ from typing import List
 from tensorflow.keras import backend as K, Model, Input, optimizers
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Activation, SpatialDropout1D, Lambda
-from tensorflow.keras.layers import Layer, BatchNormalization, LayerNormalization, Conv1D, Dense
+from tensorflow.keras.layers import Layer, BatchNormalization, LayerNormalization
 
-# import tensorflow_probability as tfp
-# Conv1D = tfp.layers.Convolution1DFlipout
-# Dense = tfp.layers.DenseFlipout
+import tensorflow as tf
+import tensorflow_probability as tfp
 
 
 def is_power_of_two(num):
@@ -52,6 +51,7 @@ class ResidualBlock(Layer):
                  activation='relu',
                  dropout_rate=0,
                  kernel_initializer='he_normal',
+                 bayesian=False,
                  use_batch_norm=False,
                  use_layer_norm=False,
                  **kwargs):
@@ -82,6 +82,7 @@ class ResidualBlock(Layer):
         self.use_batch_norm = use_batch_norm
         self.use_layer_norm = use_layer_norm
         self.kernel_initializer = kernel_initializer
+        self.bayesian = bayesian
         self.layers = []
         self.layers_outputs = []
         self.shape_match_conv = None
@@ -109,12 +110,20 @@ class ResidualBlock(Layer):
             for k in range(2):
                 name = 'conv1D_{}'.format(k)
                 with K.name_scope(name):  # name scope used to make sure weights get unique names
-                    self._add_and_activate_layer(Conv1D(filters=self.nb_filters,
-                                                        kernel_size=self.kernel_size,
-                                                        dilation_rate=self.dilation_rate,
-                                                        padding=self.padding,
-                                                        name=name))
-                                                        # kernel_initializer=self.kernel_initializer))
+                    if self.bayesian:
+                        self._add_and_activate_layer(tfp.layers.Convolution1DFlipout(filters=self.nb_filters,
+                                                            kernel_size=self.kernel_size,
+                                                            dilation_rate=self.dilation_rate,
+                                                            padding=self.padding,
+                                                            name=name))
+                                                            # kernel_initializer=self.kernel_initializer))
+                    else:
+                        self._add_and_activate_layer(tf.keras.layers.Conv1D(filters=self.nb_filters,
+                                                            kernel_size=self.kernel_size,
+                                                            dilation_rate=self.dilation_rate,
+                                                            padding=self.padding,
+                                                            name=name,
+                                                            kernel_initializer=self.kernel_initializer))
 
                 with K.name_scope('norm_{}'.format(k)):
                     if self.use_batch_norm:
@@ -130,11 +139,18 @@ class ResidualBlock(Layer):
                 name = 'matching_conv1D'
                 with K.name_scope(name):
                     # make and build this layer separately because it directly uses input_shape
-                    self.shape_match_conv = Conv1D(filters=self.nb_filters,
-                                                   kernel_size=1,
-                                                   padding='same',
-                                                   name=name)
-                                                   # kernel_initializer=self.kernel_initializer)
+                    if self.bayesian:
+                        self.shape_match_conv = tfp.layers.Convolution1DFlipout(filters=self.nb_filters,
+                                                       kernel_size=1,
+                                                       padding='same',
+                                                       name=name)
+                                                       # kernel_initializer=self.kernel_initializer)
+                    else:
+                        self.shape_match_conv = tf.keras.layers.Conv1D(filters=self.nb_filters,
+                                                       kernel_size=1,
+                                                       padding='same',
+                                                       name=name,
+                                                       kernel_initializer=self.kernel_initializer)
 
             else:
                 name = 'matching_identity'
@@ -214,6 +230,7 @@ class TCN(Layer):
                  kernel_initializer='he_normal',
                  use_batch_norm=False,
                  use_layer_norm=False,
+                 bayesian=False,
                  **kwargs):
 
         self.return_sequences = return_sequences
@@ -234,6 +251,7 @@ class TCN(Layer):
         self.build_output_shape = None
         self.lambda_layer = None
         self.lambda_ouput_shape = None
+        self.bayesian = bayesian
 
         if padding != 'causal' and padding != 'same':
             raise ValueError("Only 'causal' or 'same' padding are compatible for this layer.")
@@ -276,6 +294,7 @@ class TCN(Layer):
                                                           use_batch_norm=self.use_batch_norm,
                                                           use_layer_norm=self.use_layer_norm,
                                                           kernel_initializer=self.kernel_initializer,
+                                                          bayesian=self.bayesian,
                                                           name='residual_block_{}'.format(len(self.residual_blocks))))
                 # build newest residual block
                 self.residual_blocks[-1].build(self.build_output_shape)
@@ -359,7 +378,8 @@ def compiled_tcn(num_feat,  # type: int
                  opt='adam',
                  lr=0.002,
                  use_batch_norm=False,
-                 use_layer_norm=False):
+                 use_layer_norm=False,
+                 bayesian=False):
     # type: (...) -> Model
     """Creates a compiled TCN model for a given task (i.e. regression or classification).
     Classification uses a sparse categorical loss. Please input class ids and not one-hot encodings.
@@ -408,7 +428,10 @@ def compiled_tcn(num_feat,  # type: int
 
     if not regression:
         # classification
-        x = Dense(num_classes)(x)
+        if bayesian:
+            x = tfp.layers.DenseFlipout(num_classes)(x)
+        else:
+            x = tf.keras.layers.Dense(num_classes)(x)
         x = Activation('softmax')(x)
         output_layer = x
         model = Model(input_layer, output_layer)
@@ -428,7 +451,10 @@ def compiled_tcn(num_feat,  # type: int
         model.compile(get_opt(), loss='sparse_categorical_crossentropy', metrics=[accuracy])
     else:
         # regression
-        x = Dense(output_len)(x)
+        if bayesian:
+            x = tfp.layers.DenseFlipout(output_len)(x)
+        else:
+            x = tf.keras.layers.Dense(output_len)(x)
         x = Activation('linear')(x)
         output_layer = x
         model = Model(input_layer, output_layer)

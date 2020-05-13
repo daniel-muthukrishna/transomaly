@@ -7,7 +7,7 @@ def negloglike_with_error():
     """ Tensorflow negative loglikelihood loss function including data uncertainties with tensorflow probability """
 
     def loss(y_true, y_pred):
-        npb = int(y_true.shape[-1] / 2)  # Assumes no contextual information
+        npb = 2#int(y_true.shape[-1] / 2)  # Assumes no contextual information
 
         y_err = y_true[:, :, npb:2*npb]
         y_t = y_true[:, :, 0:npb]
