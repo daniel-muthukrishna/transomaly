@@ -5,7 +5,7 @@ import h5py
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import Dense, LSTM, TimeDistributed, Masking, Conv1D
+from tensorflow.keras.layers import Dense, LSTM, TimeDistributed, Masking
 
 import tensorflow_probability as tfp
 tfd = tfp.distributions
@@ -114,8 +114,9 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
     if not retrain and os.path.isfile(model_filename):
         model = load_tf_model(model_filename, lossfn, bayesian, X_train, passbands, reframe, probabilistic, nunits)
     else:
-        if probabilistic and bayesian:
+        if bayesian:
             tf.compat.v1.disable_eager_execution()  # Needed because of known Tensorflow bug with Convolutional VI
+
         if train_from_last_stop:
             old_model_name = f"keras_model_epochs{train_from_last_stop}_{model_change}"
             old_model_filename = os.path.join(fig_dir, old_model_name, f"{old_model_name}.hdf5")
@@ -178,9 +179,9 @@ def main():
     model, model_name = train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir=fig_dir, epochs=train_epochs,
                         retrain=retrain, passbands=passbands, model_change=nn_architecture_change, reframe=reframe_problem, probabilistic=probabilistic, train_from_last_stop=train_from_last_stop, batch_size=batch_size, nunits=nunits, use_uncertainties=use_uncertainties, bayesian=bayesian)
 
-    # plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
-    #              fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise, bayesian=bayesian)
-    #
+    plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands=passbands,
+                 fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise, bayesian=bayesian)
+
     plot_metrics(model, model_name, X_train, y_train, timesX_train, yerr_train, labels_train, objids_train, passbands=passbands,
                  fig_dir=fig_dir, nsamples=nsamples, data_dir=data_dir, save_dir=save_dir, nprocesses=nprocesses, plot_gp=True, extrapolate_gp=extrapolate_gp, reframe=reframe_problem, plot_name='_training_set', npred=npred, probabilistic=probabilistic, known_redshift=known_redshift, get_data_func=get_data_func, normalise=normalise, bayesian=bayesian)
 

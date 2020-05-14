@@ -50,8 +50,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         X_test = np.asarray(X_test, np.float32)
         y_test = np.asarray(y_test, np.float32)
         yhat = model(X_test)
-        y_pred = yhat.mean()
-        y_pred_std = yhat.stddev()
+        y_pred = np.asarray(yhat.mean())
+        y_pred_std = np.asarray(yhat.stddev())
     else:
         y_pred = model.predict(X_test)
 
