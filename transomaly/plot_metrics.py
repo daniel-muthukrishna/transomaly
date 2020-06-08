@@ -41,90 +41,43 @@ def plot_history(history, model_filename):
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
 
 
-def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands, fig_dir, nsamples, data_dir,  save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False, plot_name='', npred=49, probabilistic=False, known_redshift=False, get_data_func=None, normalise=False, bayesian=False):
+def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands,
+                 fig_dir, nsamples, data_dir, save_dir, nprocesses, plot_gp=False, extrapolate_gp=True, reframe=False,
+                 plot_name='', npred=49, probabilistic=False, known_redshift=False, get_data_func=None, normalise=False,
+                 bayesian=False):
     print(model_name)
     nobjects, ntimesteps, nfeatures = X_test.shape
     npassbands = len(passbands)
 
+    sampled_ypred = []
+    sampled_ystd = []
+    draws = []
     if probabilistic:
         X_test = np.asarray(X_test, np.float32)
         y_test = np.asarray(y_test, np.float32)
         yhat = model(X_test)
         y_pred = np.asarray(yhat.mean())
         y_pred_std = np.asarray(yhat.stddev())
+        if bayesian:
+            ns = 100
+            for i in range(ns):
+                sampled_yhat = model(X_test)
+                sampled_ypred.append(np.asarray(sampled_yhat.mean()))
+                sampled_ystd.append(np.asarray(sampled_yhat.stddev()))
+                draws.append(np.random.normal(sampled_yhat.mean(), sampled_yhat.stddev()))
+            # plot_mean_ypred = np.mean(np.array(sampled_ypred), axis=0)
+            # plot_sigma_ypred = np.std(np.array(sampled_ypred), axis=0)
+            plot_mean_ypred = np.mean(np.array(draws), axis=0)
+            plot_sigma_ypred = np.std(np.array(draws), axis=0)
+        else:
+            yhat = model(X_test)
+            plot_mean_ypred = np.asarray(yhat.mean())
+            plot_sigma_ypred = np.asarray(yhat.stddev())
     else:
         y_pred = model.predict(X_test)
 
     if not reframe:
         npred = ntimesteps
-
-    if not probabilistic:
-        if reframe is True:
-            X_test = X_test[::npred]
-            nobjects, ntimesteps, npassbands = X_test.shape
-            y_test = y_test.reshape(nobjects, npred, npassbands)[:,::-1,:]
-            y_pred = y_pred.reshape(nobjects, npred, npassbands)[:,::-1,:]
-            yerr_test = yerr_test.reshape(nobjects, npred, npassbands)[:,::-1,:]
-        else:
-            # test that it's only using previous data
-            plt.figure()
-            trial_X = np.copy(X_test[0:1])
-            out = model.predict(trial_X)
-            trial_X[:, -20:] = np.zeros(trial_X[:, -20:].shape)
-            out2 = model.predict(trial_X)
-            plt.plot(y_test[0, :, 0], label='original data')
-            plt.plot(out[0, :, 0], label='prediction on all data')
-            plt.plot(out2[0, :, 0], label='prediction not using last 20 time-steps')
-            plt.legend()
-            plt.savefig(os.path.join(fig_dir, model_name, "test_using_previous_timesteps_only{}".format(plot_name)))
-
-    # y_test_correct_format = np.zeros(X_test.shape)
-    # y_pred_correct_format = np.zeros(X_test.shape)
-    # y_test_correct_format[:, :, 0] = np.copy(y_test[:, -1, :49])
-    # y_test_correct_format[:, :, 1] = np.copy(y_test[:, -1, :])
-    # y_pred_correct_format[:, :, 0] = np.copy(y_pred[:, -1, :49])
-    # y_pred_correct_format[:, :, 1] = np.copy(y_pred[:, -1, :])
-    # y_test = np.copy(y_test_correct_format)
-    # y_pred = np.copy(y_pred_correct_format)
-
-    # nsamples = 1 ##
-
-    # # Get reduced chi_squared
-    # chi2_hist = []
-    # chi2_reduced_allobjects = 0
-    # reduce_count = 0
-    # save_object_chi2 = []
-    # save_chi2 = {}
-    # for idx in range(nobjects):
-    #     for pbidx, pb in enumerate(passbands):
-    #         m = yerr_test[idx, :, pbidx] != 0  # ignore zeros (where no data exists)
-    #         yt = y_test[idx, :, pbidx][m]
-    #         yp = y_pred[idx, :, pbidx][m]
-    #         ye = yerr_test[idx, :, pbidx][m]
-    #         if len(yt) == 0:
-    #             reduce_count += 1
-    #             print(f"No values for {objids_test[idx]} {pb}-band")
-    #             continue
-    #         chi2 = sum(((yt - yp) / ye) ** 2)
-    #         chi2_reduced = chi2 / len(yt)
-    #         chi2_reduced_allobjects += chi2_reduced
-    #     chi2_hist.append(chi2_reduced/npassbands)
-    #     save_object_chi2.append((idx, objids_test[idx], chi2_reduced/npassbands))
-    #     save_chi2[objids_test[idx]] = chi2_reduced/npassbands
-    # chi2_reduced_allobjects = chi2_reduced_allobjects / ((nobjects * npassbands) - reduce_count)
-    # print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
-    # print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
-    # with open(os.path.join(fig_dir, model_name, f'model_info{plot_name}.txt'), 'w') as file:
-    #     file.write(f"{model_name}\n")
-    #     file.write(f"Reduced chi-squared: {chi2_reduced_allobjects}\n")
-    #     file.write(f"Median reduced chi-squared: {np.median(chi2_hist)}\n")
-    # # plt.figure()
-    # # plt.hist(chi2_hist, bins=max(100, int(max(chi2_hist)/10)), range=(0, int(np.mean(chi2_hist) + 3*np.std(chi2_hist))))
-    # # plt.legend()
-    # # plt.xlabel("chi-squared")
-    # # plt.savefig(os.path.join(fig_dir, model_name, 'chi_squared_distribution{}.pdf'.format(plot_name)))
-    # save_object_chi2 = sorted(save_object_chi2, key=lambda x: x[2])
-    # print(save_object_chi2[:100])
 
     # Get raw light curve data
     light_curves = {}
@@ -136,19 +89,17 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                                           nprocesses=nprocesses, redo=False, calculate_t0=False)
         if plot_gp is True and nsamples == 1:
             gp_fits[classnum] = save_gps(light_curves, save_dir, classnum, passbands, plot=False,
-                                     nprocesses=nprocesses, redo=False, extrapolate=extrapolate_gp)
+                                         nprocesses=nprocesses, redo=False, extrapolate=extrapolate_gp)
 
     # Plot predictions vs time per class
     font = {'family': 'normal',
             'size': 36}
     matplotlib.rc('font', **font)
 
-    for idx in np.arange(0, 100):
-    # for (idx, oid, chi2_red) in save_object_chi2[:100]:
-    #     print(idx, oid, chi2_red)
+    for idx in np.arange(0, 10):
         sidx = idx * nsamples  # Assumes like samples are in order
         print("Plotting example vs time", idx, objids_test[sidx])
-        argmax = None  #timesX_test[sidx].argmax()  # -1
+        argmax = None  # timesX_test[sidx].argmax()  # -1
 
         # Get raw light curve observations
         lc = light_curves[labels_test[sidx]][objids_test[sidx]]
@@ -160,22 +111,36 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         for pbidx, pb in enumerate(passbands):
             pbmask = lc['passband'] == pb
 
-            for s in range(nsamples):
+            for s in range(1):  # nsamples):
                 lw = 3 if s == 0 else 0.5
                 alpha = 1 if s == 0 else 0.1
                 plotlabeltest = "ytest:{}".format(pb) if s == 0 else ''
                 plotlabelpred = "ypred:{}".format(pb) if s == 0 else ''
                 marker = None  # MARKPB[pb] if s == 0 else None
                 if reframe:
-                    ax1.plot(timesX_test[sidx + s][:-1][:argmax], X_test[sidx + s][:, pbidx][:-1][:argmax], c=COLPB[pb], lw=lw,
+                    ax1.plot(timesX_test[sidx + s][:-1][:argmax], X_test[sidx + s][:, pbidx][:-1][:argmax], c=COLPB[pb],
+                             lw=lw,
                              label=plotlabeltest, marker=marker, markersize=10, alpha=alpha, linestyle='-')
-                ax1.plot(timesX_test[sidx+s][1:][-npred:][:argmax], y_test[sidx+s][:, pbidx][:argmax], c=COLPB[pb], lw=lw,
+                ax1.plot(timesX_test[sidx + s][1:][-npred:][:argmax], y_test[sidx + s][:, pbidx][:argmax], c=COLPB[pb],
+                         lw=lw,
                          label=plotlabeltest, marker='o', markersize=10, alpha=alpha, linestyle='-')
                 if probabilistic:
-                    ax1.errorbar(timesX_test[sidx + s][1:][-npred:][:argmax], y_pred[sidx + s][:, pbidx][:argmax], yerr=y_pred_std[sidx + s][:, pbidx][:argmax],
-                             color=COLPB[f'{pb}pred'], lw=lw, label=plotlabelpred, marker='*', markersize=10, alpha=alpha, linestyle=':')
+                    if bayesian:
+                        for sp in range(ns):
+                            ax1.errorbar(timesX_test[sidx + s][1:][-npred:][:argmax],
+                                         sampled_ypred[sp][sidx + s][:, pbidx][:argmax],
+                                         yerr=sampled_ystd[sp][sidx + s][:, pbidx][:argmax],
+                                         color=COLPB[f'{pb}pred'], lw=0.5, marker='*', markersize=10, alpha=1 / 256,
+                                         linestyle=':')
+                    ax1.errorbar(timesX_test[sidx + s][1:][-npred:][:argmax],
+                                 plot_mean_ypred[sidx + s][:, pbidx][:argmax],
+                                 yerr=plot_sigma_ypred[sidx + s][:, pbidx][:argmax],
+                                 color=COLPB[f'{pb}pred'], lw=lw, label=plotlabelpred, marker='x', markersize=20,
+                                 alpha=1, linestyle=':')
+
                 else:
-                    ax1.plot(timesX_test[sidx+s][1:][-npred:][:argmax], y_pred[sidx+s][:, pbidx][:argmax], c=COLPB[f'{pb}pred'], lw=lw,
+                    ax1.plot(timesX_test[sidx + s][1:][-npred:][:argmax], y_pred[sidx + s][:, pbidx][:argmax],
+                             c=COLPB[f'{pb}pred'], lw=lw,
                              label=plotlabelpred, marker='*', markersize=10, alpha=alpha, linestyle=':')
 
         if not normalise:
@@ -187,7 +152,8 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
                 pred_mean, pred_var = gp_lc[pb].predict(lc[pbmask]['flux'].data, timesX_test[sidx + s][:argmax],
                                                         return_var=True)
                 pred_std = np.sqrt(pred_var)
-                ax1.fill_between(timesX_test[sidx + s][:argmax], pred_mean + pred_std, pred_mean - pred_std, color=COLPB[pb],
+                ax1.fill_between(timesX_test[sidx + s][:argmax], pred_mean + pred_std, pred_mean - pred_std,
+                                 color=COLPB[pb],
                                  alpha=0.05,
                                  edgecolor="none")
             # ax1.text(0.05, 0.95, f"$\chi^2 = {round(save_chi2[objids_test[idx]], 3)}$", horizontalalignment='left',
@@ -196,28 +162,29 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
 
         # Plot anomaly scores
         chi2_samples = []
-        for s in range(nsamples):
+        for s in range(1):  # nsamples):
             chi2 = 0
             for pbidx in range(npassbands):
-                m = yerr_test[sidx+s, :, pbidx][:argmax] != 0  # ignore zeros (where no data exists)
-                yt = y_test[sidx+s, :, pbidx][:argmax][m]
-                yp = y_pred[sidx+s, :, pbidx][:argmax][m]
-                ye = yerr_test[sidx+s, :, pbidx][:argmax][m]
+                m = yerr_test[sidx + s, :, pbidx][:argmax] != 0  # ignore zeros (where no data exists)
+                yt = y_test[sidx + s, :, pbidx][:argmax][m]
+                yp = y_pred[sidx + s, :, pbidx][:argmax][m]
+                ye = yerr_test[sidx + s, :, pbidx][:argmax][m]
                 try:
-                    chi2 += ((yp - yt)/ye)**2
+                    chi2 += ((yp - yt) / ye) ** 2
                 except ValueError as e:
                     pbidx -= 1
                     m = yerr_test[sidx + s, :, pbidx][:argmax] != 0
-                    print(f"Failed chi2 object {objids_test[sidx+s]}", e)
+                    print(f"Failed chi2 object {objids_test[sidx + s]}", e)
             chi2_samples.append(chi2 / npassbands)
         anomaly_score_samples = chi2_samples
         anomaly_score_mean = np.mean(anomaly_score_samples, axis=0)
         anomaly_score_std = np.std(anomaly_score_samples, axis=0)
-        ax2.text(0.05, 0.95, f"$\chi^2 = {round(np.sum(anomaly_score_mean)/len(yt), 3)}$", horizontalalignment='left',
+        ax2.text(0.05, 0.95, f"$\chi^2 = {round(np.sum(anomaly_score_mean) / len(yt), 3)}$", horizontalalignment='left',
                  verticalalignment='center', transform=ax2.transAxes)
 
         ax2.plot(timesX_test[sidx][1:][-npred:][:argmax][m], anomaly_score_mean, lw=3, marker='o')
-        ax2.fill_between(timesX_test[sidx][1:][-npred:][:argmax][m], anomaly_score_mean + anomaly_score_std, anomaly_score_mean - anomaly_score_std, alpha=0.3, edgecolor="none")
+        ax2.fill_between(timesX_test[sidx][1:][-npred:][:argmax][m], anomaly_score_mean + anomaly_score_std,
+                         anomaly_score_mean - anomaly_score_std, alpha=0.3, edgecolor="none")
 
         ax1.legend(frameon=True, fontsize=33)
         ax1.set_ylabel("Relative flux")
@@ -229,8 +196,6 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
         plt.close()
 
     print(model_name)
-    print(f"Reduced chi-squared for model is {chi2_reduced_allobjects}")
-    print(f"Median reduced chi-squared for model is {np.median(chi2_hist)}")
 
 
 def similarity_metric(model, X_test, y_test, yerr_test, labels_test, objids_test, nsamples):

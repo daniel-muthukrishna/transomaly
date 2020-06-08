@@ -55,7 +55,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
         nobjects = len(light_curves)
         nrows = nobjects * nsamples
 
-        labels = np.empty(shape=nobjects, dtype=object)
+        labels = np.empty(shape=nrows, dtype=object)
         # X = np.memmap(os.path.join(self.training_set_dir, 'X_lc_data.dat'), dtype=np.float32, mode='w+',
         #               shape=(nrows, self.nfeatures, self.nobs))
         # Xerr = np.memmap(os.path.join(self.training_set_dir, 'Xerr_lc_data.dat'), dtype=np.float32, mode='w+',

@@ -93,6 +93,8 @@ class PrepareArrays(object):
         # Add contextual information
         for ns in range(nsamples):
             for jj, c_info in enumerate(contextual_info, 1):
+                if meta_data[c_info] == None:
+                    meta_data[c_info] = 0
                 X[idx + ns][j + jj][0:len_t] = meta_data[c_info] * np.ones(len_t)
 
         return X, Xerr
