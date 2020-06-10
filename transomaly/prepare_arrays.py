@@ -70,8 +70,8 @@ class PrepareArrays(object):
             fluxerr = fluxerr[timemask]
             photflag = photflag[timemask]
 
-            if time.size < 1:
-                print(f"No {pb}-band observations in range for object {objid}")
+            if time.size < 2:
+                print(f"Not enough {pb}-band observations in range for object {objid}")
                 continue
 
             # # USE GP FITS BELOW
@@ -98,14 +98,14 @@ class PrepareArrays(object):
 
             fluxinterp = f(tinterp)
             fluxinterp = np.nan_to_num(fluxinterp)
-            fluxinterp = fluxinterp.clip(min=0)
+            # fluxinterp = fluxinterp.clip(min=0)
             fluxerrinterp = np.zeros(len_t)
 
             for interp_idx, fluxinterp_val in enumerate(fluxinterp):
                 if fluxinterp_val == 0.:
                     fluxerrinterp[interp_idx] = 0
                 else:
-                    nearest_idx = helpers.find_nearest(time, tinterp[interp_idx])
+                    nearesttim_idx = helpers.find_nearest(time, tinterp[interp_idx])
                     fluxerrinterp[interp_idx] = fluxerr[nearest_idx]
 
             X[idx][j][0:len_t] = fluxinterp
