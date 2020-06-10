@@ -167,7 +167,10 @@ class PrepareTrainingSetArrays(PrepareArrays):
                         norm = 1
                     else:
                         norm = maxflux - minflux
-                    X_train_normalised[i, :, pbidx] = (flux - minflux)/norm
+                    mask_zeros = (flux == 0)
+                    fluxnorm = (flux - minflux)/norm
+                    fluxnorm[mask_zeros] = 0
+                    X_train_normalised[i, :, pbidx] = fluxnorm
                     Xerr_train_normalised[i, :, pbidx] = fluxerr / norm
             nobjects, ntimesteps, nfeatures = X_test.shape
             X_test_normalised = np.zeros(X_test.shape)
