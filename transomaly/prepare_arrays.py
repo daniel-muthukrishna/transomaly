@@ -109,7 +109,7 @@ class PrepareArrays(object):
                     fluxerrinterp[interp_idx] = fluxerr[nearest_idx]
 
             X[idx][j][0:len_t] = fluxinterp
-            Xerr[idx][j * 2 + 1][0:len_t] = fluxerrinterp
+            Xerr[idx][j][0:len_t] = fluxerrinterp
 
         # # USING GP FITS SAMPLES
         # # Add contextual information
