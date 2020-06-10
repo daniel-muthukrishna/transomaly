@@ -105,7 +105,7 @@ class PrepareArrays(object):
                 if fluxinterp_val == 0.:
                     fluxerrinterp[interp_idx] = 0
                 else:
-                    nearesttim_idx = helpers.find_nearest(time, tinterp[interp_idx])
+                    nearest_idx = helpers.find_nearest(time, tinterp[interp_idx])
                     fluxerrinterp[interp_idx] = fluxerr[nearest_idx]
 
             X[idx][j][0:len_t] = fluxinterp
