@@ -262,13 +262,13 @@ class PrepareTrainingSetArrays(PrepareArrays):
             Xerr_test = Xerr_test[:, :-n_pred]
             # timesX_test = timesX_test[:, :-1]
 
-            # Delete indexes where any errors are zero
-            delete_indexes = np.unique(np.where(Xerr_train == 0)[0])
-            print("Deleting indexes where any uncertainties are zero for objids", objids_train[delete_indexes])
-            X_train, y_train, Xerr_train, yerr_train, timesX_train, labels_train, objids_train = delete_indexes_from_arrays(delete_indexes, 0, X_train, y_train, Xerr_train, yerr_train, timesX_train, labels_train, objids_train)
-            delete_indexes = np.unique(np.where(Xerr_test == 0)[0])
-            print("Deleting indexes where any uncertainties are zero for objids", objids_train[delete_indexes])
-            X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test = delete_indexes_from_arrays(delete_indexes, 0, X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test)
+            # # Delete indexes where any errors are zero
+            # delete_indexes = np.unique(np.where(Xerr_train == 0)[0])
+            # print("Deleting indexes where any uncertainties are zero for objids", objids_train[delete_indexes])
+            # X_train, y_train, Xerr_train, yerr_train, timesX_train, labels_train, objids_train = delete_indexes_from_arrays(delete_indexes, 0, X_train, y_train, Xerr_train, yerr_train, timesX_train, labels_train, objids_train)
+            # delete_indexes = np.unique(np.where(Xerr_test == 0)[0])
+            # print("Deleting indexes where any uncertainties are zero for objids", objids_test[delete_indexes])
+            # X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test = delete_indexes_from_arrays(delete_indexes, 0, X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test)
 
             if use_uncertainties:
                 # Add errors as extra column to y
