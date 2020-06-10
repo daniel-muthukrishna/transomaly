@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.interpolate import interp1d
+from transomaly import helpers
 
 
 class PrepareArrays(object):
@@ -72,29 +74,57 @@ class PrepareArrays(object):
                 print(f"No {pb}-band observations in range for object {objid}")
                 continue
 
-            # Draw samples from GP
-            try:
-                gp_lc[pb].compute(time, fluxerr)
-            except Exception as e:
-                print(f"ERROR FOR OBJECT: {objid}", e)
-                continue
-            pred_mean, pred_var = gp_lc[pb].predict(flux, tinterp, return_var=True)
-            pred_std = np.sqrt(pred_var)
-            if nsamples > 1:
-                samples = gp_lc[pb].sample_conditional(flux, t=tinterp, size=nsamples)
-            elif nsamples == 1:
-                samples = [pred_mean]
+            # # USE GP FITS BELOW
+            # # Draw samples from GP
+            # try:
+            #     gp_lc[pb].compute(time, fluxerr)
+            # except Exception as e:
+            #     print(f"ERROR FOR OBJECT: {objid}", e)
+            #     continue
+            # pred_mean, pred_var = gp_lc[pb].predict(flux, tinterp, return_var=True)
+            # pred_std = np.sqrt(pred_var)
+            # if nsamples > 1:
+            #     samples = gp_lc[pb].sample_conditional(flux, t=tinterp, size=nsamples)
+            # elif nsamples == 1:
+            #     samples = [pred_mean]
+            #
+            # # store samples in X
+            # for ns in range(nsamples):
+            #     X[idx + ns][j][0:len_t] = samples[ns]
+            #     Xerr[idx + ns][j][0:len_t] = pred_std
 
-            # store samples in X
-            for ns in range(nsamples):
-                X[idx + ns][j][0:len_t] = samples[ns]
-                Xerr[idx + ns][j][0:len_t] = pred_std
+            # USE LINEAR INTERPOLATION INSTEAD
+            f = interp1d(time, flux, kind='linear', bounds_error=False, fill_value=0.)
+
+            fluxinterp = f(tinterp)
+            fluxinterp = np.nan_to_num(fluxinterp)
+            fluxinterp = fluxinterp.clip(min=0)
+            fluxerrinterp = np.zeros(len_t)
+
+            for interp_idx, fluxinterp_val in enumerate(fluxinterp):
+                if fluxinterp_val == 0.:
+                    fluxerrinterp[interp_idx] = 0
+                else:
+                    nearest_idx = helpers.find_nearest(time, tinterp[interp_idx])
+                    fluxerrinterp[interp_idx] = fluxerr[nearest_idx]
+
+            X[idx][j][0:len_t] = fluxinterp
+            Xerr[idx][j * 2 + 1][0:len_t] = fluxerrinterp
+
+        # # USING GP FITS SAMPLES
+        # # Add contextual information
+        # for ns in range(nsamples):
+        #     for jj, c_info in enumerate(contextual_info, 1):
+        #         if meta_data[c_info] == None:
+        #             meta_data[c_info] = 0
+        #         X[idx + ns][j + jj][0:len_t] = meta_data[c_info] * np.ones(len_t)
+
+        # USE LINEAR INTERPOLATION INSTEAD
 
         # Add contextual information
-        for ns in range(nsamples):
-            for jj, c_info in enumerate(contextual_info, 1):
-                if meta_data[c_info] == None:
-                    meta_data[c_info] = 0
-                X[idx + ns][j + jj][0:len_t] = meta_data[c_info] * np.ones(len_t)
+        for jj, c_info in enumerate(contextual_info, 1):
+            if meta_data[c_info] == None:
+                meta_data[c_info] = 0
+            X[idx][j + jj][0:len_t] = meta_data[c_info] * np.ones(len_t)
 
         return X, Xerr

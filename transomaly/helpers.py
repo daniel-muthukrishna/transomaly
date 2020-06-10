@@ -42,3 +42,15 @@ def delete_indexes_from_arrays(delete_indexes, axis=None, *args):
         assert len(arr.shape) == len(newarr.shape)
 
     return newarrs
+
+
+def find_nearest(array, value):
+    """
+    Find the index nearest to a given value.
+    Adapted from: https://stackoverflow.com/questions/2566412/find-nearest-value-in-numpy-array
+    """
+
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+
+    return idx
