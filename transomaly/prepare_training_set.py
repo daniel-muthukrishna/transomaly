@@ -12,8 +12,8 @@ from transomaly.helpers import delete_indexes_from_arrays
 class PrepareTrainingSetArrays(PrepareArrays):
     def __init__(self, passbands=('g', 'r'), contextual_info=('redshift',), data_dir='data/ZTF_20190512/',
                  save_dir='data/saved_light_curves/', training_set_dir='data/training_set_files/', redo=False,
-                 get_data_func=None):
-        PrepareArrays.__init__(self, passbands, contextual_info)
+                 get_data_func=None, use_gp_interp=False):
+        PrepareArrays.__init__(self, passbands, contextual_info, use_gp_interp)
         self.passbands = passbands
         self.contextual_info = contextual_info
         self.nobs = 50

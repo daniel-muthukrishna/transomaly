@@ -7,8 +7,8 @@ from transomaly.fit_gaussian_processes import fit_gaussian_process
 
 
 class PrepareInputArrays(PrepareArrays):
-    def __init__(self, passbands=('g', 'r'), contextual_info=('redshift',), extrapolate_gp=True):
-        PrepareArrays.__init__(self, passbands, contextual_info)
+    def __init__(self, passbands=('g', 'r'), contextual_info=('redshift',), extrapolate_gp=True, use_gp_interp=False):
+        PrepareArrays.__init__(self, passbands, contextual_info, use_gp_interp)
         self.passbands = passbands
         self.contextual_info = contextual_info
         self.extrapolate_gp = extrapolate_gp # ΔG^0 = ΔH^0 - TΔS^0

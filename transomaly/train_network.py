@@ -47,6 +47,8 @@ def build_model(X_train, passbands=('g', 'r'), reframe=False, probabilistic=Fals
     if probabilistic:
         outputs = tfp.layers.DistributionLambda(
             lambda t: tfd.Normal(loc=t[..., :npb], scale=1e-3 + tf.math.softplus(0.01 * t[..., npb:])))(hidden)
+    else:
+        outputs = hidden
 
     model = Model(inputs, outputs)
 
@@ -110,10 +112,11 @@ def main():
     nprocesses = None
     class_nums = (1,)
     otherchange = 'linear_interpolation'  # single_object_1_50075859'
+    use_gp_interp = False
     nsamples = 1
     extrapolate_gp = True
     redo = False
-    train_epochs = 1000
+    train_epochs = 20
     retrain = False
     reframe_problem = False
     npred = 1
@@ -121,7 +124,7 @@ def main():
     batch_size = 128
     nunits = 30
     train_from_last_stop = 0
-    normalise = False
+    normalise = True
     use_uncertainties = True
     bayesian = True
     dropout_rate = 0.3
@@ -133,7 +136,7 @@ def main():
         os.makedirs(fig_dir)
 
     preparearrays = PrepareTrainingSetArrays(passbands, contextual_info, data_dir, save_dir, training_set_dir, redo,
-                                             get_data_func)
+                                             get_data_func, use_gp_interp=use_gp_interp)
     X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
     timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test = \
         preparearrays.make_training_set(class_nums, nsamples, otherchange, nprocesses, extrapolate_gp,

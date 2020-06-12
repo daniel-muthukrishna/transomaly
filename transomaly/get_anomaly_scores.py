@@ -23,12 +23,13 @@ CLASS_COLOR = {'SNIa-norm': 'tab:green', 'SNIbc': 'tab:orange', 'SNII': 'tab:blu
 
 
 class TransientRegressor(object):
-    def __init__(self, nsamples=1, model_class='SNIa-norm', model_filepath='', passbands=('g', 'r')):
+    def __init__(self, nsamples=1, model_class='SNIa-norm', model_filepath='', passbands=('g', 'r'), use_gp_interp=False):
 
         self.nsamples = nsamples
         self.passbands = passbands
         self.contextual_info = ()  #### CHECK THIS ####
         self.npb = len(passbands)
+        self.use_gp_interp = use_gp_interp
 
         if model_filepath != '' and os.path.exists(model_filepath):
             self.model_filepath = model_filepath
@@ -62,7 +63,7 @@ class TransientRegressor(object):
 
         """
 
-        prepareinputarrays = PrepareInputArrays(self.passbands, self.contextual_info)
+        prepareinputarrays = PrepareInputArrays(self.passbands, self.contextual_info, use_gp_interp=self.use_gp_interp)
         X, Xerr, y, yerr, timesX, objids_list, trigger_mjds, lcs, gp_fits = prepareinputarrays.make_input_arrays(light_curves, self.nsamples)
 
         return X, Xerr, y, yerr, timesX, objids_list, trigger_mjds, lcs, gp_fits
