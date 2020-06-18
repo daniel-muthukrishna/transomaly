@@ -37,7 +37,7 @@ def negloglike():
         sigma = y_pred.scale  # Distribution parameter for standard deviation
 
         mse = -0.5 * tf.square((y_true - mu)/sigma)
-        sigma_trace = -tf.math.log(sigma)
+        sigma_trace = -0.5*tf.math.log(tf.square(sigma))
         log2pi = -0.5 * np.log(2 * np.pi)
 
         loglikelihood = mse + sigma_trace + log2pi

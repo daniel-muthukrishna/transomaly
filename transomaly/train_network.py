@@ -57,7 +57,7 @@ def build_model(X_train, passbands=('g', 'r'), reframe=False, probabilistic=Fals
 
 def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir='.', epochs=20, retrain=False,
                 passbands=('g', 'r'), model_change='', reframe=False, probabilistic=False, train_from_last_stop=0,
-                batch_size=50, nunits=100, use_uncertainties=False, bayesian=False, dropout_rate=0.0):
+                batch_size=50, nunits=100, use_uncertainties=False, bayesian=False, dropout_rate=0.0, learning_rate=0.01):
 
     model_name = f"keras_model_epochs{epochs+train_from_last_stop}_{model_change}"
     model_filename = os.path.join(fig_dir, model_name, f"{model_name}.hdf5")
@@ -87,7 +87,7 @@ def train_model(X_train, X_test, y_train, y_test, yerr_train, yerr_test, fig_dir
                                 batch_size=batch_size, verbose=2, inital_epoch=train_from_last_stop)
         else:
             model = build_model(X_train, passbands, reframe, probabilistic, nunits, bayesian, dropout_rate=dropout_rate)
-            model.compile(loss=lossfn, optimizer='adam')
+            model.compile(loss=lossfn, optimizer=tf.optimizers.Adam(learning_rate=learning_rate))
             tcn_full_summary(model, expand_residual_blocks=True)
             history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=batch_size, verbose=2)
 
@@ -122,6 +122,7 @@ def main():
     npred = 1
     probabilistic = True
     batch_size = 128
+    learning_rate = 0.01
     nunits = 30
     train_from_last_stop = 0
     normalise = True
@@ -129,7 +130,7 @@ def main():
     bayesian = True
     dropout_rate = 0.3
 
-    nn_architecture_change = f"mcdropout_TCN_{'probabilistic_' if probabilistic else ''}bayesian{bayesian}_uncertainties{use_uncertainties}_predictfuture{npred}point_normalised{normalise}_dropout{dropout_rate}_{nunits}units_batchsize{batch_size}"
+    nn_architecture_change = f"mcdropout_TCN_{'probabilistic_' if probabilistic else ''}bayesian{bayesian}_uncertainties{use_uncertainties}_predictfuture{npred}point_normalised{normalise}_dropout{dropout_rate}_units{nunits}_batchsize{batch_size}_lr{learning_rate}"
 
     fig_dir = os.path.join(fig_dir, "model_{}_ci{}_ns{}_c{}".format(otherchange, contextual_info, nsamples, class_nums))
     if not os.path.exists(fig_dir):
