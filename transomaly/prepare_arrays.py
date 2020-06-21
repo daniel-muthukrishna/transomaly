@@ -95,20 +95,24 @@ class PrepareArrays(object):
                     Xerr[idx + ns][j][0:len_t] = pred_std
 
             else:
-                # USE LINEAR INTERPOLATION INSTEAD
-                f = interp1d(time, flux, kind='linear', bounds_error=False, fill_value=0.)
+                # USE LINEAR SPLINE INTERPOLATION INSTEAD
+                # f = interp1d(time, flux, kind='linear', bounds_error=False, fill_value=0.) ##
+                spl = helpers.ErrorPropagationSpline(time, flux, fluxerr, N=1000, ext='zeros')  # #
 
-                fluxinterp = f(tinterp)
+                # fluxinterp = f(tinterp) ##
+                fluxinterp, fluxerrinterp = spl(tinterp)  # #
                 fluxinterp = np.nan_to_num(fluxinterp)
                 # fluxinterp = fluxinterp.clip(min=0)
                 fluxerrinterp = np.zeros(len_t)
 
-                for interp_idx, fluxinterp_val in enumerate(fluxinterp):
-                    if fluxinterp_val == 0.:
-                        fluxerrinterp[interp_idx] = 0
-                    else:
-                        nearest_idx = helpers.find_nearest(time, tinterp[interp_idx])
-                        fluxerrinterp[interp_idx] = fluxerr[nearest_idx]
+                ##
+                # for interp_idx, fluxinterp_val in enumerate(fluxinterp):
+                #     if fluxinterp_val == 0.:
+                #         fluxerrinterp[interp_idx] = 0
+                #     else:
+                #         nearest_idx = helpers.find_nearest(time, tinterp[interp_idx])  ##
+                #         fluxerrinterp[interp_idx] = fluxerr[nearest_idx]  ##
+                #         # fluxerrinterp[interp_idx] = fluxerrinterp[interp_idx]
 
                 X[idx][j][0:len_t] = fluxinterp
                 Xerr[idx][j][0:len_t] = fluxerrinterp

@@ -111,7 +111,7 @@ def main():
     known_redshift = True if 'redshift' in contextual_info else False
     nprocesses = None
     class_nums = (1,)
-    otherchange = 'linear_interpolation'  # single_object_1_50075859'
+    otherchange = 'spline_interpolation'  # single_object_1_50075859'
     use_gp_interp = False
     nsamples = 1
     extrapolate_gp = True
