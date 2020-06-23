@@ -97,7 +97,7 @@ class PrepareArrays(object):
             else:
                 # USE LINEAR SPLINE INTERPOLATION INSTEAD
                 # f = interp1d(time, flux, kind='linear', bounds_error=False, fill_value=0.) ##
-                spl = helpers.ErrorPropagationSpline(time, flux, fluxerr, N=1000, ext='zeros')  # #
+                spl = helpers.ErrorPropagationSpline(time, flux, fluxerr, k=1, N=100, ext='zeros')  # #
 
                 # fluxinterp = f(tinterp) ##
                 fluxinterp, fluxerrinterp = spl(tinterp)  # #
