@@ -93,7 +93,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
         return X, Xerr, timesX, labels, objids
 
-    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49, normalise=False, use_uncertainties=False):
+    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49, normalise=False, use_uncertainties=False, ignore_objids=()):
         savepath = os.path.join(self.training_set_dir, "X_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums))
 
         if self.redo is True or not os.path.isfile(savepath):
@@ -108,6 +108,14 @@ class PrepareTrainingSetArrays(PrepareArrays):
             # Find intersection of dictionaries
             objids = list(set(light_curves.keys()) & set(saved_gp_fits.keys()))
             # objids = ['1_50075859', '1_50075859'] # '1_99285690', '1_99285690']  ####
+
+            # Remove objids in ignore_objids
+            count_removed = 0
+            for objid in ignore_objids:
+                objids.remove(objid)
+                print(f"Ignoring object: {objid}")
+                count_removed += 1
+            print(f"Ignored {count_removed} objects")
 
             # Train test split for light_ curves and GPs
             objids_train, objids_test = train_test_split(objids, train_size=0.80, shuffle=True, random_state=42)
