@@ -110,6 +110,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
             # objids = ['1_50075859', '1_50075859'] # '1_99285690', '1_99285690']  ####
 
             # Only use objids in only_use_objids unless not specified
+            print("Removing objects that were not in only_use_objids:", set(objids) - set(only_use_objids))
             if only_use_objids is not None and len(only_use_objids) >= 1:
                 objids = list(set(only_use_objids) & set(objids))
 
