@@ -103,9 +103,9 @@ class PrepareArrays(object):
                 fluxinterp, fluxerrinterp = spl(tinterp)  # #
                 fluxinterp = np.nan_to_num(fluxinterp)
                 # fluxinterp = fluxinterp.clip(min=0)
-                fluxerrinterp = np.zeros(len_t)
 
                 ##
+                # fluxerrinterp = np.zeros(len_t)
                 # for interp_idx, fluxinterp_val in enumerate(fluxinterp):
                 #     if fluxinterp_val == 0.:
                 #         fluxerrinterp[interp_idx] = 0
