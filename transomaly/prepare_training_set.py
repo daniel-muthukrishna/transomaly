@@ -113,6 +113,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
             print("Removing objects that were not in only_use_objids:", set(objids) - set(only_use_objids))
             if only_use_objids is not None and len(only_use_objids) >= 1:
                 objids = list(set(set(only_use_objids) & set(objids)))
+                print(objids)
 
             # Remove objids in ignore_objids
             for objid in ignore_objids:
