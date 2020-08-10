@@ -284,11 +284,16 @@ class PrepareTrainingSetArrays(PrepareArrays):
             # X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test = delete_indexes_from_arrays(delete_indexes, 0, X_test, y_test, Xerr_test, yerr_test, timesX_test, labels_test, objids_test)
 
             if use_uncertainties:
-                # Add errors as extra column to y
+                # Add errors as extra column to y and X
                 ye_train = np.copy(yerr_train)
                 ye_test = np.copy(yerr_test)
                 y_train = np.dstack((y_train, ye_train))
                 y_test = np.dstack((y_test, ye_test))
+
+                Xe_train = np.copy(Xerr_train)
+                Xe_test = np.copy(Xerr_test)
+                X_train = np.dstack((X_train, Xe_train))
+                X_test = np.dstack((X_test, Xe_test))
 
         return X_train, X_test, y_train, y_test, Xerr_train, Xerr_test, yerr_train, yerr_test, \
                timesX_train, timesX_test, labels_train, labels_test, objids_train, objids_test
