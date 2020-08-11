@@ -44,7 +44,7 @@ def plot_history(history, model_filename):
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
     # Plot zoomed figure reduced y axis
     lenloss = len(trainloss)
-    zoomloss = int(lenloss / 4.)
+    zoomloss = int(0.75*lenloss)
     plt.figure()
     plt.plot(np.arange(zoomloss, lenloss), trainloss[zoomloss:])
     plt.plot(np.arange(zoomloss, lenloss), valloss[zoomloss:])
