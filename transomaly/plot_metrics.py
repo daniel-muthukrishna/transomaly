@@ -10,6 +10,8 @@ from transomaly.fit_gaussian_processes import save_gps
 from astrorapid.get_training_data import get_data
 from transomaly import helpers
 
+from astropy.stats import median_absolute_deviation
+
 # matplotlib.use('TkAgg')
 
 
@@ -38,6 +40,7 @@ def plot_history(history, model_filename):
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
+    plt.ylim(top=1.1*max(np.array(valloss[zoomloss:])[abs(valloss[zoomloss:]-np.median(valloss[zoomloss:])) < 5 * median_absolute_deviation(valloss[zoomloss:])]))
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
     # Plot zoomed figure reduced y axis
     lenloss = len(trainloss)
@@ -48,7 +51,7 @@ def plot_history(history, model_filename):
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
-    plt.ylim(top=1.1*max(np.array(valloss)[abs(valloss-np.median(valloss)) < 5 * np.std(valloss)]))
+    plt.ylim(top=1.1*max(np.array(valloss[zoomloss:])[abs(valloss[zoomloss:]-np.median(valloss[zoomloss:])) < 5 * median_absolute_deviation(valloss[zoomloss:])]))
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed2.pdf')}")
 
 
