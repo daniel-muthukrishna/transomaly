@@ -39,6 +39,17 @@ def plot_history(history, model_filename):
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
+    # Plot zoomed figure reduced y axis
+    lenloss = len(trainloss)
+    zoomloss = int(lenloss / 4.)
+    plt.figure()
+    plt.plot(np.arange(zoomloss, lenloss), trainloss[zoomloss:])
+    plt.plot(np.arange(zoomloss, lenloss), valloss[zoomloss:])
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.ylim(top=1.1*max(np.array(valloss)[abs(valloss-np.median(valloss)) < 5 * np.std(valloss)]))
+    plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed2.pdf')}")
 
 
 def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labels_test, objids_test, passbands,
@@ -91,10 +102,10 @@ def plot_metrics(model, model_name, X_test, y_test, timesX_test, yerr_test, labe
             gp_fits[classnum] = save_gps(light_curves, save_dir, classnum, passbands, plot=False,
                                          nprocesses=nprocesses, redo=False, extrapolate=extrapolate_gp)
 
-    # Plot predictions vs time per class
-    font = {'family': 'normal',
-            'size': 36}
-    matplotlib.rc('font', **font)
+    # # Plot predictions vs time per class
+    # font = {'family': 'normal',
+    #         'size': 36}
+    # matplotlib.rc('font', **font)
 
     for idx in np.arange(0, 10):
         sidx = idx * nsamples  # Assumes like samples are in order
