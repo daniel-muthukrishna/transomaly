@@ -40,7 +40,7 @@ def plot_history(history, model_filename):
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
-    plt.ylim(bottom=min(0, 1.1*min(valloss)), top=1.1*max(np.array(valloss[zoomloss:])[abs(valloss[zoomloss:]-np.median(valloss[zoomloss:])) < 5 * median_absolute_deviation(valloss[zoomloss:])]))
+    plt.ylim(bottom=min(valloss)-abs(0.1*min(valloss)), top=1.1*max(np.array(valloss[zoomloss:])[abs(valloss[zoomloss:]-np.median(valloss[zoomloss:])) < 5 * median_absolute_deviation(valloss[zoomloss:])]))
     plt.savefig(f"{model_filename.replace('.hdf5', '_zoomed.pdf')}")
     # Plot zoomed figure reduced y axis
     lenloss = len(trainloss)
