@@ -65,11 +65,14 @@ class PrepareTrainingSetArrays(PrepareArrays):
         timesX = np.zeros(shape=(nrows, self.nobs))
         objids = []
 
-        for i, (objid, gp_lc) in enumerate(saved_gp_fits.items()):
+        for i, (objid, lc) in enumerate(light_curves.items()):
             idx = i * nsamples
             if i % 100 == 0:
                 print(i, nobjects)
-            lc = light_curves[objid]
+            if self.use_gp_interp:
+                gp_lc = saved_gp_fits[objid]
+            else:
+                gp_lc = None
 
             redshift = lc.meta['redshift']
             b = lc.meta['b']
@@ -101,13 +104,14 @@ class PrepareTrainingSetArrays(PrepareArrays):
             saved_gp_fits = {}
             for class_num in class_nums:
                 lcs = self.get_light_curves(class_num, nprocesses)
-                gps = self.get_gaussian_process_fits(lcs, class_num, plot=False, nprocesses=nprocesses, extrapolate=extrapolate_gp)
                 light_curves.update(lcs)
-                saved_gp_fits.update(gps)
-
-            # Find intersection of dictionaries
-            objids = list(set(light_curves.keys()) & set(saved_gp_fits.keys()))
-            # objids = ['1_50075859', '1_50075859'] # '1_99285690', '1_99285690']  ####
+                if self.use_gp_interp:
+                    gps = self.get_gaussian_process_fits(lcs, class_num, plot=False, nprocesses=nprocesses, extrapolate=extrapolate_gp)
+                    saved_gp_fits.update(gps)
+                    # Find intersection of dictionaries
+                    objids = list(set(light_curves.keys()) & set(saved_gp_fits.keys()))
+                else:
+                    objids = list(set(light_curves.keys()))
 
             # Only use objids in only_use_objids unless not specified
             if only_use_objids is not None and len(only_use_objids) >= 1:
@@ -122,9 +126,13 @@ class PrepareTrainingSetArrays(PrepareArrays):
             # Train test split for light_ curves and GPs
             objids_train, objids_test = train_test_split(objids, train_size=0.80, shuffle=True, random_state=42)
             lcs_train = {k: light_curves[k] for k in objids_train}
-            gps_train = {k: saved_gp_fits[k] for k in objids_train}
             lcs_test = {k: light_curves[k] for k in objids_test}
-            gps_test = {k: saved_gp_fits[k] for k in objids_test}
+            if self.use_gp_interp:
+                gps_train = {k: saved_gp_fits[k] for k in objids_train}
+                gps_test = {k: saved_gp_fits[k] for k in objids_test}
+            else:
+                gps_train = None
+                gps_test = None
 
             X_train, Xerr_train, timesX_train, labels_train, objids_train = self.make_arrays(lcs_train, gps_train, nsamples, extrapolate_gp)
             X_test, Xerr_test, timesX_test, labels_test, objids_test = self.make_arrays(lcs_test, gps_test, nsamples, extrapolate_gp)
