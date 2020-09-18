@@ -96,7 +96,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
         return X, Xerr, timesX, labels, objids
 
-    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49, normalise=False, use_uncertainties=False, ignore_objids=(), only_use_objids=None):
+    def make_training_set(self, class_nums=(1,), nsamples=10, otherchange='', nprocesses=1, extrapolate_gp=True, reframe=False, npred=49, normalise=False, use_uncertainties=False, ignore_objids=(), only_use_objids=None, train_size=0.8):
         savepath = os.path.join(self.training_set_dir, "X_train_{}_ci{}_ns{}_c{}.npy".format(otherchange, self.contextual_info, nsamples, class_nums))
 
         if self.redo is True or not os.path.isfile(savepath):
@@ -124,7 +124,7 @@ class PrepareTrainingSetArrays(PrepareArrays):
                 print(f"Ignoring object: {objid}")
 
             # Train test split for light_ curves and GPs
-            objids_train, objids_test = train_test_split(objids, train_size=0.80, shuffle=True, random_state=42)
+            objids_train, objids_test = train_test_split(objids, train_size=train_size, shuffle=True, random_state=42)
             lcs_train = {k: light_curves[k] for k in objids_train}
             lcs_test = {k: light_curves[k] for k in objids_test}
             if self.use_gp_interp:
