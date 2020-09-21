@@ -67,8 +67,18 @@ class ErrorPropagationSpline(object):
         """
         See docstring for InterpolatedUnivariateSpline
         """
-        yy = np.vstack([y + np.random.normal(loc=0, scale=yerr) for i in range(N)]).T
-        self._splines = [spline(x, yy[:, i], *args, **kwargs) for i in range(N)]
+        try:
+            yy = np.vstack([y + np.random.normal(loc=0, scale=yerr) for i in range(N)]).T
+            self._splines = [spline(x, yy[:, i], *args, **kwargs) for i in range(N)]
+        except ValueError:
+            # Error because x must be strictly increasing. Removing consecutive duplicates
+            repeated_indexes = np.where(np.diff(x) == 0)[0]
+            y = np.delete(y, repeated_indexes)
+            yerr = np.delete(yerr, repeated_indexes)
+            x = np.delete(x, repeated_indexes)
+
+            yy = np.vstack([y + np.random.normal(loc=0, scale=yerr) for i in range(N)]).T
+            self._splines = [spline(x, yy[:, i], *args, **kwargs) for i in range(N)]
 
     def __call__(self, x, *args, **kwargs):
         """
