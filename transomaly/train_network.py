@@ -32,7 +32,7 @@ def build_model(X_train, passbands=('g', 'r'), reframe=False, probabilistic=Fals
     hidden = Masking(mask_value=0.)(inputs)
 
     hidden = TCN(nunits, return_sequences=True, kernel_size=2, nb_stacks=1, dilations=[1, 2, 4, 8],
-                 padding='same', use_skip_connections=True, dropout_rate=dropout_rate, activation='sigmoid')(hidden, training=mc_dropout)
+                 padding='causal', use_skip_connections=True, dropout_rate=dropout_rate, activation='sigmoid')(hidden, training=mc_dropout)
     hidden = Dropout(dropout_rate)(hidden, training=mc_dropout)
 
     if reframe is True:

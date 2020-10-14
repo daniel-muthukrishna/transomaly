@@ -81,7 +81,11 @@ class PrepareTrainingSetArrays(PrepareArrays):
 
             # TODO: make cuts
 
-            tinterp, len_t = self.get_t_interp(lc, extrapolate=extrapolate)
+            try:
+                tinterp, len_t = self.get_t_interp(lc, extrapolate=extrapolate)
+            except ValueError as e:
+                print(f"Zero light curve points for objid {objid}")
+                continue
             for ns in range(nsamples):
                 timesX[idx + ns][0:len_t] = tinterp
                 objids.append(objid)
